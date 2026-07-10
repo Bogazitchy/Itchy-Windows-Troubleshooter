@@ -1,0 +1,13 @@
+bin/
+obj/
+Reports/
+.vs/
+*.user
+*.suo
+*.log
+*.dmp
+*.mdmp
+*.hdmp
+*.kdmp
+publish/
+artifacts/
