@@ -8,9 +8,9 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon />
     <AssemblyName>ITCHY Windows Troubleshooter</AssemblyName>
-    <Version>1.1.0</Version>
-    <FileVersion>1.1.0.0</FileVersion>
-    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <Version>1.2.0</Version>
+    <FileVersion>1.2.0.0</FileVersion>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
     <Authors>Bogazitchy</Authors>
     <Description>Windows 10/11 system diagnostics and advanced blue screen dump analysis.</Description>
     <RepositoryUrl>https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter</RepositoryUrl>

@@ -5,14 +5,25 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="ITCHY Windows Troubleshooter" Height="820" Width="1240" MinHeight="720" MinWidth="1080"
-        Background="#0f1720" Foreground="#eef4fb" WindowStartupLocation="CenterScreen">
+        Title="ITCHY Windows Troubleshooter" Height="860" Width="1320" MinHeight="740" MinWidth="1120"
+        Background="#0D1117" Foreground="#F0F6FC" WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI" FontSize="13">
     <Window.Resources>
-        <SolidColorBrush x:Key="PanelBrush" Color="#162230"/>
-        <SolidColorBrush x:Key="AccentBrush" Color="#3ba6ff"/>
-        <SolidColorBrush x:Key="MutedBrush" Color="#9fb0c3"/>
-        <SolidColorBrush x:Key="DangerBrush" Color="#ff5a6a"/>
-        <SolidColorBrush x:Key="WarningBrush" Color="#ffb84d"/>
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#0D1117"/>
+        <SolidColorBrush x:Key="SidebarBrush" Color="#090D12"/>
+        <SolidColorBrush x:Key="PanelBrush" Color="#161B22"/>
+        <SolidColorBrush x:Key="ElevatedBrush" Color="#1C2128"/>
+        <SolidColorBrush x:Key="InsetBrush" Color="#0B1016"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#30363D"/>
+        <SolidColorBrush x:Key="StrongBorderBrush" Color="#484F58"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#2F81F7"/>
+        <SolidColorBrush x:Key="AccentHoverBrush" Color="#388BFD"/>
+        <SolidColorBrush x:Key="CyanBrush" Color="#39C5BB"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#F0F6FC"/>
+        <SolidColorBrush x:Key="MutedBrush" Color="#8B949E"/>
+        <SolidColorBrush x:Key="DangerBrush" Color="#F85149"/>
+        <SolidColorBrush x:Key="WarningBrush" Color="#D29922"/>
+        <SolidColorBrush x:Key="SuccessBrush" Color="#3FB950"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
 
         <Style x:Key="CopyableText" TargetType="TextBlock">
@@ -27,6 +38,13 @@
         </Style>
 
         <Style TargetType="TextBox">
+            <Setter Property="Background" Value="{StaticResource InsetBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="CaretBrush" Value="{StaticResource TextBrush}"/>
+            <Setter Property="SelectionBrush" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8"/>
             <Setter Property="ContextMenu">
                 <Setter.Value>
                     <ContextMenu>
@@ -39,12 +57,56 @@
             </Setter>
         </Style>
 
-        <Style TargetType="Button">
-            <Setter Property="Background" Value="#25364a"/>
-            <Setter Property="Foreground" Value="#eef4fb"/>
-            <Setter Property="BorderBrush" Value="#37516d"/>
+        <Style TargetType="ContextMenu">
+            <Setter Property="Background" Value="{StaticResource ElevatedBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource StrongBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="Padding" Value="4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ContextMenu">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="5"
+                                Padding="{TemplateBinding Padding}">
+                            <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="MenuItem">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="MenuItem">
+                        <Border x:Name="MenuChrome" Background="{TemplateBinding Background}" CornerRadius="4" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter ContentSource="Header" RecognizesAccessKey="True"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter TargetName="MenuChrome" Property="Background" Value="#2D333B"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#6E7681"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="Button">
+            <Setter Property="Background" Value="#21262D"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource StrongBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="14,8"/>
             <Setter Property="Margin" Value="0,0,8,8"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -55,9 +117,9 @@
                                 Background="{TemplateBinding Background}"
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
-                                CornerRadius="6"
+                                CornerRadius="5"
                                 Padding="{TemplateBinding Padding}"
-                                MinHeight="34"
+                                MinHeight="36"
                                 MinWidth="58">
                             <ContentPresenter HorizontalAlignment="Center"
                                               VerticalAlignment="Center"
@@ -69,18 +131,134 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ButtonChrome" Property="Background" Value="#2f4863"/>
-                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="#4d79a3"/>
-                                <Setter Property="Foreground" Value="#ffffff"/>
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="#2D333B"/>
+                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="#6E7681"/>
+                                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ButtonChrome" Property="Background" Value="#1b75bb"/>
-                                <Setter Property="Foreground" Value="#ffffff"/>
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="#1F6FEB"/>
+                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="ButtonChrome" Property="Background" Value="#1a2430"/>
-                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="#2a3948"/>
-                                <Setter Property="Foreground" Value="#7f8b98"/>
+                                <Setter TargetName="ButtonChrome" Property="Background" Value="#161B22"/>
+                                <Setter TargetName="ButtonChrome" Property="BorderBrush" Value="#30363D"/>
+                                <Setter Property="Foreground" Value="#6E7681"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+
+        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Foreground" Value="#FFB3AD"/>
+            <Setter Property="BorderBrush" Value="#6E3633"/>
+            <Setter Property="Background" Value="#2A1718"/>
+        </Style>
+
+        <ControlTemplate x:Key="VerticalScrollBarTemplate" TargetType="ScrollBar">
+            <Grid Background="Transparent">
+                <Track x:Name="PART_Track" IsDirectionReversed="True" Orientation="Vertical">
+                    <Track.DecreaseRepeatButton>
+                        <RepeatButton Command="ScrollBar.PageUpCommand" Background="Transparent" BorderThickness="0" Opacity="0"/>
+                    </Track.DecreaseRepeatButton>
+                    <Track.Thumb>
+                        <Thumb>
+                            <Thumb.Template>
+                                <ControlTemplate TargetType="Thumb">
+                                    <Border x:Name="ThumbChrome" Background="#484F58" CornerRadius="4" Margin="2,1"/>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ThumbChrome" Property="Background" Value="#6E7681"/>
+                                        </Trigger>
+                                        <Trigger Property="IsDragging" Value="True">
+                                            <Setter TargetName="ThumbChrome" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Thumb.Template>
+                        </Thumb>
+                    </Track.Thumb>
+                    <Track.IncreaseRepeatButton>
+                        <RepeatButton Command="ScrollBar.PageDownCommand" Background="Transparent" BorderThickness="0" Opacity="0"/>
+                    </Track.IncreaseRepeatButton>
+                </Track>
+            </Grid>
+        </ControlTemplate>
+
+        <ControlTemplate x:Key="HorizontalScrollBarTemplate" TargetType="ScrollBar">
+            <Grid Background="Transparent">
+                <Track x:Name="PART_Track" Orientation="Horizontal">
+                    <Track.DecreaseRepeatButton>
+                        <RepeatButton Command="ScrollBar.PageLeftCommand" Background="Transparent" BorderThickness="0" Opacity="0"/>
+                    </Track.DecreaseRepeatButton>
+                    <Track.Thumb>
+                        <Thumb>
+                            <Thumb.Template>
+                                <ControlTemplate TargetType="Thumb">
+                                    <Border x:Name="ThumbChrome" Background="#484F58" CornerRadius="4" Margin="1,2"/>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="ThumbChrome" Property="Background" Value="#6E7681"/>
+                                        </Trigger>
+                                        <Trigger Property="IsDragging" Value="True">
+                                            <Setter TargetName="ThumbChrome" Property="Background" Value="{StaticResource AccentBrush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Thumb.Template>
+                        </Thumb>
+                    </Track.Thumb>
+                    <Track.IncreaseRepeatButton>
+                        <RepeatButton Command="ScrollBar.PageRightCommand" Background="Transparent" BorderThickness="0" Opacity="0"/>
+                    </Track.IncreaseRepeatButton>
+                </Track>
+            </Grid>
+        </ControlTemplate>
+
+        <Style TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Width" Value="11"/>
+            <Setter Property="Template" Value="{StaticResource VerticalScrollBarTemplate}"/>
+            <Style.Triggers>
+                <Trigger Property="Orientation" Value="Horizontal">
+                    <Setter Property="Width" Value="Auto"/>
+                    <Setter Property="Height" Value="11"/>
+                    <Setter Property="Template" Value="{StaticResource HorizontalScrollBarTemplate}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style TargetType="ProgressBar">
+            <Setter Property="Background" Value="#21262D"/>
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="4" ClipToBounds="True">
+                            <Grid x:Name="PART_Track" ClipToBounds="True">
+                                <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" HorizontalAlignment="Left"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsIndeterminate" Value="True">
+                                <Setter TargetName="PART_Indicator" Property="Width" Value="72"/>
+                                <Setter TargetName="PART_Indicator" Property="RenderTransform">
+                                    <Setter.Value><TranslateTransform X="-72"/></Setter.Value>
+                                </Setter>
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard>
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetName="PART_Indicator" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)" From="-72" To="220" Duration="0:0:1.1"/>
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -89,14 +267,17 @@
         </Style>
 
         <Style TargetType="DataGrid">
-            <Setter Property="Background" Value="#111b26"/>
-            <Setter Property="Foreground" Value="#eef4fb"/>
-            <Setter Property="BorderBrush" Value="#26384c"/>
-            <Setter Property="RowBackground" Value="#111b26"/>
-            <Setter Property="AlternatingRowBackground" Value="#152130"/>
-            <Setter Property="HorizontalGridLinesBrush" Value="#26384c"/>
-            <Setter Property="VerticalGridLinesBrush" Value="#26384c"/>
+            <Setter Property="Background" Value="{StaticResource PanelBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="RowBackground" Value="{StaticResource PanelBrush}"/>
+            <Setter Property="AlternatingRowBackground" Value="#191F27"/>
+            <Setter Property="HorizontalGridLinesBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="VerticalGridLinesBrush" Value="{StaticResource BorderBrush}"/>
             <Setter Property="GridLinesVisibility" Value="Horizontal"/>
+            <Setter Property="RowHeight" Value="34"/>
+            <Setter Property="ColumnHeaderHeight" Value="38"/>
             <Setter Property="IsReadOnly" Value="True"/>
             <Setter Property="CanUserAddRows" Value="False"/>
             <Setter Property="HeadersVisibility" Value="Column"/>
@@ -115,74 +296,69 @@
         </Style>
 
         <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="#223247"/>
-            <Setter Property="Foreground" Value="#f7fbff"/>
-            <Setter Property="BorderBrush" Value="#344a62"/>
+            <Setter Property="Background" Value="#21262D"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="0,0,1,1"/>
-            <Setter Property="Padding" Value="8,7"/>
+            <Setter Property="Padding" Value="10,8"/>
             <Setter Property="FontWeight" Value="Bold"/>
         </Style>
 
         <Style TargetType="DataGridRow">
-            <Setter Property="Foreground" Value="#eef4fb"/>
-            <Setter Property="Background" Value="#111b26"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Background" Value="{StaticResource PanelBrush}"/>
             <Style.Triggers>
                 <Trigger Property="AlternationIndex" Value="1">
-                    <Setter Property="Background" Value="#152130"/>
+                    <Setter Property="Background" Value="#191F27"/>
                 </Trigger>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#20344a"/>
-                    <Setter Property="Foreground" Value="#ffffff"/>
+                    <Setter Property="Background" Value="#252C35"/>
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
                 </Trigger>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#1b75bb"/>
-                    <Setter Property="Foreground" Value="#ffffff"/>
+                    <Setter Property="Background" Value="#183B64"/>
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style TargetType="DataGridCell">
-            <Setter Property="Foreground" Value="#eef4fb"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Padding" Value="10,6"/>
             <Style.Triggers>
                 <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#1b75bb"/>
-                    <Setter Property="Foreground" Value="#ffffff"/>
+                    <Setter Property="Background" Value="#1F6FEB"/>
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
 
         <Style TargetType="TabItem">
-            <Setter Property="Foreground" Value="#c6d4e3"/>
-            <Setter Property="Background" Value="#162230"/>
-            <Setter Property="BorderBrush" Value="#33475d"/>
-            <Setter Property="Padding" Value="16,10"/>
-            <Setter Property="Margin" Value="0,0,4,0"/>
+            <Setter Property="Foreground" Value="#B1BAC4"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="Margin" Value="0,0,3,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="TabItem">
-                        <Border x:Name="TabChrome"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="1"
-                                CornerRadius="4,4,0,0"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter ContentSource="Header"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"
-                                              TextElement.Foreground="{TemplateBinding Foreground}"/>
-                        </Border>
+                        <Grid>
+                            <Border x:Name="TabChrome" Background="{TemplateBinding Background}" CornerRadius="5" Padding="{TemplateBinding Padding}">
+                                <ContentPresenter ContentSource="Header" HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}"/>
+                            </Border>
+                            <Border x:Name="SelectionBar" Height="2" Background="{StaticResource AccentBrush}" VerticalAlignment="Bottom" Margin="8,0" Visibility="Collapsed"/>
+                        </Grid>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="TabChrome" Property="Background" Value="#253b52"/>
-                                <Setter Property="Foreground" Value="#ffffff"/>
+                                <Setter TargetName="TabChrome" Property="Background" Value="#21262D"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                             <Trigger Property="IsSelected" Value="True">
-                                <Setter TargetName="TabChrome" Property="Background" Value="#176ea8"/>
-                                <Setter TargetName="TabChrome" Property="BorderBrush" Value="#4aaeff"/>
-                                <Setter Property="Foreground" Value="#ffffff"/>
+                                <Setter TargetName="TabChrome" Property="Background" Value="#1C2128"/>
+                                <Setter TargetName="SelectionBar" Property="Visibility" Value="Visible"/>
+                                <Setter Property="Foreground" Value="#FFFFFF"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -190,25 +366,85 @@
             </Setter>
         </Style>
 
+        <Style x:Key="MainTabItem" TargetType="TabItem" BasedOn="{StaticResource {x:Type TabItem}}">
+            <Setter Property="MinWidth" Value="0"/>
+            <Setter Property="Padding" Value="11,9"/>
+            <Setter Property="Margin" Value="0,0,2,4"/>
+        </Style>
+
+        <Style x:Key="MainTabControl" TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TabControl">
+                        <Grid KeyboardNavigation.TabNavigation="Local">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,0,0,5" Margin="0,0,0,2">
+                                <ItemsPresenter KeyboardNavigation.TabIndex="1"/>
+                            </Border>
+                            <ContentPresenter x:Name="PART_SelectedContentHost" Grid.Row="1"
+                                              ContentSource="SelectedContent"
+                                              SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="Card" TargetType="Border">
             <Setter Property="Background" Value="{StaticResource PanelBrush}"/>
-            <Setter Property="BorderBrush" Value="#26384c"/>
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="CornerRadius" Value="7"/>
             <Setter Property="Padding" Value="16"/>
             <Setter Property="Margin" Value="0,0,12,12"/>
         </Style>
 
+        <Style x:Key="MetricCard" TargetType="Border" BasedOn="{StaticResource Card}">
+            <Setter Property="Background" Value="{StaticResource ElevatedBrush}"/>
+            <Setter Property="BorderThickness" Value="3,1,1,1"/>
+            <Setter Property="Padding" Value="14,12"/>
+        </Style>
+
         <Style x:Key="SectionTitle" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="FontSize" Value="18"/>
             <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="#f7fbff"/>
-            <Setter Property="Margin" Value="0,0,0,12"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="Margin" Value="0,0,0,10"/>
         </Style>
 
         <Style x:Key="MutedText" TargetType="TextBlock" BasedOn="{StaticResource CopyableText}">
             <Setter Property="Foreground" Value="{StaticResource MutedBrush}"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+
+        <Style TargetType="ListBoxItem">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border Background="{TemplateBinding Background}" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="{StaticResource ElevatedBrush}"/>
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            <Setter Property="BorderBrush" Value="{StaticResource StrongBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,5"/>
         </Style>
     </Window.Resources>
 
@@ -222,81 +458,124 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="250"/>
+            <ColumnDefinition Width="270"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
-        <Border Grid.Column="0" Background="#0b1118" Padding="22">
+        <Border Grid.Column="0" Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Padding="18">
             <DockPanel LastChildFill="True">
                 <StackPanel DockPanel.Dock="Top">
-                    <TextBlock Text="ITCHY" FontSize="30" FontWeight="Black" Foreground="{StaticResource AccentBrush}"/>
-                    <TextBlock Text="Windows Troubleshooter" Foreground="#dce8f5" FontSize="15" Margin="0,2,0,24"/>
-                    <Border Background="#13202d" CornerRadius="8" Padding="12" Margin="0,0,0,20">
+                    <Grid Margin="0,2,0,22">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="44"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Width="40" Height="40" Background="{StaticResource AccentBrush}" CornerRadius="7" HorizontalAlignment="Left">
+                            <TextBlock Text="I" FontSize="22" FontWeight="Black" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0">
+                            <TextBlock Text="ITCHY" FontSize="21" FontWeight="Black" Foreground="{StaticResource TextBrush}"/>
+                            <TextBlock Text="Windows Troubleshooter" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
+                        </StackPanel>
+                    </Grid>
+                    <Border Background="{StaticResource ElevatedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="3,1,1,1" CornerRadius="7" Padding="13" Margin="0,0,0,18">
                         <StackPanel>
-                            <TextBlock Text="Sistem Durumu" Foreground="{StaticResource MutedBrush}"/>
-                            <TextBlock Text="{Binding SystemStatus}" FontSize="22" FontWeight="Bold" Margin="0,4,0,0"/>
+                            <TextBlock Text="SISTEM DURUMU" Foreground="{StaticResource MutedBrush}" FontSize="11" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding SystemStatus}" FontSize="20" FontWeight="Bold" Margin="0,5,0,0" Foreground="{StaticResource TextBrush}"/>
                             <TextBlock Text="{Binding AdminStatus}" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
-                    <Button Content="Taramayi Baslat" Click="StartScan_Click" Background="#1669a8"/>
-                    <Button Content="Taramayi Iptal Et" Click="Cancel_Click"/>
-                    <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
+                    <Button Click="StartScan_Click" Style="{StaticResource PrimaryButton}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE768;" FontSize="15" Margin="0,0,8,0"/>
+                            <TextBlock Text="Taramayi Baslat"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="Cancel_Click" Style="{StaticResource DangerButton}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE711;" FontSize="14" Margin="0,0,8,0"/>
+                            <TextBlock Text="Taramayi Iptal Et"/>
+                        </StackPanel>
+                    </Button>
+                    <Button Click="CreateReport_Click">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE74E;" FontSize="14" Margin="0,0,8,0"/>
+                            <TextBlock Text="HTML Raporu Disa Aktar"/>
+                        </StackPanel>
+                    </Button>
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Bottom">
-                    <TextBlock Text="Log" FontWeight="Bold" Margin="0,0,0,6"/>
+                    <Grid Margin="0,0,0,7">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="CANLI LOG" FontWeight="Bold" FontSize="11" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
+                        <Border Grid.Column="1" Background="#12371F" BorderBrush="#276B3B" BorderThickness="1" CornerRadius="8" Padding="7,1">
+                            <TextBlock Text="AKTIF" Foreground="#7EE787" FontSize="10" FontWeight="Bold"/>
+                        </Border>
+                    </Grid>
                     <TextBox Text="{Binding LiveLog}" Height="250" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                             Background="#070b10" Foreground="#cfe2f3" BorderBrush="#24384d"/>
+                             Background="{StaticResource InsetBrush}" Foreground="#C9D1D9" BorderBrush="{StaticResource BorderBrush}" FontFamily="Cascadia Mono, Consolas" FontSize="11.5"/>
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <Grid Grid.Column="1" Margin="22">
+        <Grid Grid.Column="1" Margin="18">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <DockPanel Grid.Row="0" Margin="0,0,0,16">
+            <Grid Grid.Row="0" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="Teknik servis ariza teshis asistani" FontSize="30" FontWeight="Bold"/>
-                    <TextBlock Text="{Binding HeaderSummary}" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>
+                    <TextBlock Text="Teknik servis ariza teshis asistani" FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextBrush}"/>
+                    <TextBlock Text="{Binding HeaderSummary}" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                 </StackPanel>
-                <ProgressBar DockPanel.Dock="Right" Width="220" Height="10"
-                             IsIndeterminate="{Binding IsBusy}"
-                             Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"
-                             Background="#1a2938" Foreground="{StaticResource AccentBrush}"
-                             Margin="24,18,0,0"/>
-            </DockPanel>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,0,0">
+                    <TextBlock Text="WINDOWS 10 / 11" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,0,0,6"/>
+                    <ProgressBar Width="220" Height="7" IsIndeterminate="{Binding IsBusy}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"/>
+                </StackPanel>
+            </Grid>
 
             <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,10">
-                <Border Style="{StaticResource Card}">
+                <Border Style="{StaticResource MetricCard}" BorderBrush="{StaticResource DangerBrush}">
                     <StackPanel>
-                        <TextBlock Text="{Binding CriticalCount}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource DangerBrush}"/>
+                        <TextBlock Text="{Binding CriticalCount}" FontSize="25" FontWeight="Bold" Foreground="{StaticResource DangerBrush}"/>
                         <TextBlock Text="Kritik bulgu" Foreground="{StaticResource MutedBrush}"/>
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource Card}">
+                <Border Style="{StaticResource MetricCard}" BorderBrush="{StaticResource WarningBrush}">
                     <StackPanel>
-                        <TextBlock Text="{Binding WarningCount}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource WarningBrush}"/>
+                        <TextBlock Text="{Binding WarningCount}" FontSize="25" FontWeight="Bold" Foreground="{StaticResource WarningBrush}"/>
                         <TextBlock Text="Uyari" Foreground="{StaticResource MutedBrush}"/>
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource Card}">
+                <Border Style="{StaticResource MetricCard}" BorderBrush="{StaticResource AccentBrush}">
                     <StackPanel>
-                        <TextBlock Text="{Binding InfoCount}" FontSize="28" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
+                        <TextBlock Text="{Binding InfoCount}" FontSize="25" FontWeight="Bold" Foreground="{StaticResource AccentBrush}"/>
                         <TextBlock Text="Bilgi" Foreground="{StaticResource MutedBrush}"/>
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource Card}">
+                <Border Style="{StaticResource MetricCard}" BorderBrush="{StaticResource CyanBrush}">
                     <StackPanel>
-                        <TextBlock Text="{Binding LastScanText}" FontSize="16" FontWeight="Bold" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding LastScanText}" FontSize="15" FontWeight="Bold" TextWrapping="Wrap" Foreground="{StaticResource CyanBrush}"/>
                         <TextBlock Text="Son tarama" Foreground="{StaticResource MutedBrush}"/>
                     </StackPanel>
                 </Border>
             </UniformGrid>
 
-            <TabControl Grid.Row="2" Background="Transparent" BorderThickness="0">
+            <TabControl Grid.Row="2" Style="{StaticResource MainTabControl}" ItemContainerStyle="{StaticResource MainTabItem}">
+                <TabControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel IsItemsHost="True"/>
+                    </ItemsPanelTemplate>
+                </TabControl.ItemsPanel>
                 <TabItem Header="Ana Panel">
                     <Grid Margin="0,14,0,0">
                         <Grid.ColumnDefinitions>
@@ -312,24 +591,24 @@
                                 </Grid.RowDefinitions>
                                 <StackPanel Grid.Row="0">
                                     <TextBlock Text="Analiz Sonucu" Style="{StaticResource SectionTitle}"/>
-                                    <Border Background="#0f1a25" BorderBrush="#2d4b66" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,14">
-                                        <TextBlock Text="{Binding AnalysisSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#eef7ff" FontSize="15" LineHeight="21"/>
+                                    <Border Background="{StaticResource InsetBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="14" Margin="0,0,0,14">
+                                        <TextBlock Text="{Binding AnalysisSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontSize="14" LineHeight="20"/>
                                     </Border>
                                 </StackPanel>
                                 <TextBlock Grid.Row="1" Text="Oncelikli Bulgular" Style="{StaticResource SectionTitle}"/>
-                                <ListBox Grid.Row="2" ItemsSource="{Binding Findings}" Background="Transparent" BorderThickness="0" Foreground="#eef4fb"
+                                <ListBox Grid.Row="2" ItemsSource="{Binding Findings}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"
                                          HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Background="#111b26" BorderBrush="#26384c" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                            <Border Background="{StaticResource ElevatedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
                                                 <StackPanel>
                                                     <DockPanel>
                                                         <TextBlock Text="{Binding Severity}" FontWeight="Bold" Foreground="{Binding SeverityBrush}" Margin="0,0,12,0"/>
                                                         <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="16" TextWrapping="Wrap"/>
                                                     </DockPanel>
-                                                    <TextBlock Text="{Binding Cause}" Style="{StaticResource CopyableText}" Foreground="#c9d7e6" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                                    <TextBlock Text="{Binding Cause}" Style="{StaticResource CopyableText}" Foreground="#C9D1D9" TextWrapping="Wrap" Margin="0,7,0,0"/>
                                                     <TextBlock Text="{Binding Evidence}" Style="{StaticResource CopyableText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,0"/>
-                                                    <TextBlock Text="{Binding Recommendation}" Style="{StaticResource CopyableText}" Foreground="#dbe9f7" TextWrapping="Wrap" Margin="0,7,0,0"/>
+                                                    <TextBlock Text="{Binding Recommendation}" Style="{StaticResource CopyableText}" Foreground="#C9D1D9" TextWrapping="Wrap" Margin="0,7,0,0"/>
                                                 </StackPanel>
                                             </Border>
                                         </DataTemplate>
@@ -341,7 +620,7 @@
                             <ScrollViewer VerticalScrollBarVisibility="Auto">
                                 <StackPanel>
                                     <TextBlock Text="Sistem Ozeti" Style="{StaticResource SectionTitle}"/>
-                                    <TextBlock Text="{Binding SystemInfoText}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#dbe9f7"/>
+                                    <TextBlock Text="{Binding SystemInfoText}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#C9D1D9"/>
                                 </StackPanel>
                             </ScrollViewer>
                         </Border>
@@ -366,10 +645,10 @@
                             <TabItem Header="Sistem ve Sicaklik">
                                 <DataGrid ItemsSource="{Binding SystemDetails}" AutoGenerateColumns="False" Margin="0,10,0,0">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Kategori" Binding="{Binding Category}" Width="150"/>
-                                        <DataGridTextColumn Header="Ozellik / Sensor" Binding="{Binding Name}" Width="260"/>
-                                        <DataGridTextColumn Header="Deger" Binding="{Binding Value}" Width="240"/>
-                                        <DataGridTextColumn Header="Durum" Binding="{Binding Status}" Width="*"/>
+                                        <DataGridTextColumn Header="Kategori" Binding="{Binding Category}" Width="140"/>
+                                        <DataGridTextColumn Header="Ozellik / Sensor" Binding="{Binding Name}" Width="240"/>
+                                        <DataGridTextColumn Header="Deger" Binding="{Binding Value}" Width="1.5*"/>
+                                        <DataGridTextColumn Header="Durum" Binding="{Binding Status}" Width="1.5*"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </TabItem>
@@ -411,19 +690,19 @@
                                 <TextBlock Text="Gelismis Mavi Ekran ve Dump Analizi" Style="{StaticResource SectionTitle}"/>
                                 <TextBlock Text="Dump butunlugu, Microsoft sembolleri, !analyze, BugCheck parametreleri, stack, supheli .sys modulu, driver bilgisi ve ayni zamandaki WHEA/disk/GPU olaylari birlikte incelenir. Ilk sembol indirmesi birkac dakika surebilir." Style="{StaticResource MutedText}"/>
                                 <WrapPanel Margin="0,12,0,0">
-                                    <Button Content="Derin Analizi Baslat" Click="BlueScreen_Click" Background="#1669a8"/>
+                                    <Button Content="Derin Analizi Baslat" Click="BlueScreen_Click" Style="{StaticResource PrimaryButton}"/>
                                     <Button Content="Dump Dosyasi Sec" Click="SelectDump_Click"/>
                                     <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
                                     <Button Content="WinDbg Kur / Guncelle" Click="InstallWinDbg_Click"/>
                                 </WrapPanel>
-                                <Border Background="#0f1a25" BorderBrush="#2d4b66" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,4,0,0">
-                                    <TextBlock Text="{Binding BlueScreenSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#eef7ff" FontSize="14" LineHeight="20"/>
+                                <Border Background="{StaticResource InsetBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,4,0,0">
+                                    <TextBlock Text="{Binding BlueScreenSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontSize="14" LineHeight="20"/>
                                 </Border>
                             </StackPanel>
                         </Border>
                         <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">
                             <TabItem Header="Derin Dump Analizi">
-                                <ListBox ItemsSource="{Binding DumpAnalyses}" Background="Transparent" BorderThickness="0" Foreground="#eef4fb"
+                                <ListBox ItemsSource="{Binding DumpAnalyses}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"
                                          HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,10,0,0">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
@@ -433,7 +712,7 @@
                                                         <TextBlock Text="{Binding Confidence}" Foreground="{Binding ConfidenceBrush}" FontWeight="Bold" Margin="0,0,12,0"/>
                                                         <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="17" TextWrapping="Wrap"/>
                                                     </DockPanel>
-                                                    <TextBlock Text="{Binding RootCauseSummary}" Style="{StaticResource CopyableText}" Foreground="#ffffff" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,10"/>
+                                                    <TextBlock Text="{Binding RootCauseSummary}" Style="{StaticResource CopyableText}" Foreground="{StaticResource TextBrush}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,10"/>
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="160"/>
@@ -449,27 +728,27 @@
                                                             <TextBlock Text="{Binding BugCheckName}" FontWeight="Bold" TextWrapping="Wrap"/>
                                                         </StackPanel>
                                                         <TextBlock Grid.Row="1" Text="Supheli bilesen" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
-                                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SuspectedComponent}" Style="{StaticResource CopyableText}" Foreground="#ffcf70" FontWeight="Bold" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SuspectedComponent}" Style="{StaticResource CopyableText}" Foreground="#FFD580" FontWeight="Bold" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="2" Text="Bilesen bilgisi" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ComponentDetails}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="3" Text="Surec / hata kovasi" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,5,0,0">
                                                             <TextBlock Text="{Binding ProcessName}" TextWrapping="Wrap"/>
-                                                            <TextBlock Text="{Binding FailureBucket}" TextWrapping="Wrap" Foreground="#b8c9da"/>
+                                                            <TextBlock Text="{Binding FailureBucket}" TextWrapping="Wrap" Foreground="#B1BAC4"/>
                                                         </StackPanel>
                                                         <TextBlock Grid.Row="4" Text="Dosya / analiz" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding IntegrityStatus}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="5" Text="Kanit" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Evidence}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="6" Text="Onerilen islem" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
-                                                        <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Recommendation}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0" Foreground="#dbe9f7"/>
+                                                        <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Recommendation}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0" Foreground="#C9D1D9"/>
                                                         <TextBlock Grid.Row="7" Text="Debugger" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding DebuggerUsed}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                     </Grid>
-                                                    <Expander Header="Ham WinDbg ciktisi ve teknik ayrintilar" Margin="0,10,0,0" Foreground="#64bfff">
+                                                    <Expander Header="Ham WinDbg ciktisi ve teknik ayrintilar" Margin="0,10,0,0" Foreground="{StaticResource AccentBrush}">
                                                         <TextBox Text="{Binding RawDebuggerOutput}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                                                                  FontFamily="Consolas" FontSize="12" Height="260" Margin="0,8,0,0"
-                                                                 Background="#070b10" Foreground="#dbe9f7" BorderBrush="#26384c"
+                                                                 Background="{StaticResource InsetBrush}" Foreground="#C9D1D9" BorderBrush="{StaticResource BorderBrush}"
                                                                  VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto"/>
                                                     </Expander>
                                                 </StackPanel>
@@ -479,14 +758,14 @@
                                 </ListBox>
                             </TabItem>
                             <TabItem Header="Olay ve Dosya Sinyalleri">
-                                <ListBox ItemsSource="{Binding BlueScreenItems}" Background="Transparent" BorderThickness="0" Foreground="#eef4fb"
+                                <ListBox ItemsSource="{Binding BlueScreenItems}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"
                                          HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,10,0,0">
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <Border Style="{StaticResource Card}">
                                                 <StackPanel>
                                                     <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="16"/>
-                                                    <TextBlock Text="{Binding Summary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#dce8f5" Margin="0,6,0,0"/>
+                                                    <TextBlock Text="{Binding Summary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#C9D1D9" Margin="0,6,0,0"/>
                                                     <TextBlock Text="{Binding TechnicalDetail}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,6,0,0"/>
                                                 </StackPanel>
                                             </Border>
@@ -509,7 +788,7 @@
                                 <TextBlock Text="Windows Hata Analizi" Style="{StaticResource SectionTitle}"/>
                                 <TextBlock Text="Ayiklanan Sorunlar bolumu uygulama, surucu, aygit ve Windows bilesenlerini adiyla gosterir. Ham Olay Kayitlari bolumu incelenen Event Viewer kayitlarini tek tek saklar." Style="{StaticResource MutedText}"/>
                                 <WrapPanel Margin="0,12,0,0">
-                                    <Button Content="Tam Taramayi Baslat" Click="StartScan_Click"/>
+                                    <Button Content="Tam Taramayi Baslat" Click="StartScan_Click" Style="{StaticResource PrimaryButton}"/>
                                     <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
                                 </WrapPanel>
                             </StackPanel>
@@ -554,7 +833,7 @@
                                 <TextBlock Text="Performans ve Guvenilirlik" Style="{StaticResource SectionTitle}"/>
                                 <TextBlock Text="Reliability Monitor kayitlari Win32_ReliabilityRecords ile okunur. Erisim kapaliysa hata acikca gosterilir." Style="{StaticResource MutedText}"/>
                                 <WrapPanel Margin="0,12,0,0">
-                                    <Button Content="Guvenilirlik Verilerini Oku" Click="Reliability_Click"/>
+                                    <Button Content="Guvenilirlik Verilerini Oku" Click="Reliability_Click" Style="{StaticResource PrimaryButton}"/>
                                     <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
                                 </WrapPanel>
                             </StackPanel>
@@ -574,9 +853,9 @@
                     <Border Style="{StaticResource Card}" Margin="0,14,0,0">
                         <StackPanel>
                             <TextBlock Text="Sistem Koruma ve Geri Yukleme" Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Text="{Binding ProtectionStatus}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#dbe9f7"/>
+                            <TextBlock Text="{Binding ProtectionStatus}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#C9D1D9"/>
                             <WrapPanel Margin="0,14,0,0">
-                                <Button Content="Durumu Yenile" Click="Protection_Click"/>
+                                <Button Content="Durumu Yenile" Click="Protection_Click" Style="{StaticResource PrimaryButton}"/>
                                 <Button Content="Geri Yukleme Noktasi Olustur" Click="CreateRestorePoint_Click"/>
                                 <Button Content="Sistem Koruma Ayarlarini Ac" Click="OpenProtection_Click"/>
                                 <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
@@ -645,8 +924,8 @@
                         <StackPanel>
                             <TextBlock Text="Raporlama" Style="{StaticResource SectionTitle}"/>
                             <TextBlock Text="HTML ve TXT raporlar kullanici ozeti ve teknik detaylari birlikte icerir." Style="{StaticResource MutedText}"/>
-                            <Button Content="HTML Raporu Disa Aktar" Width="220" HorizontalAlignment="Left" Margin="0,14,0,0" Click="CreateReport_Click"/>
-                            <TextBlock Text="{Binding ReportPath}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#dbe9f7" Margin="0,14,0,0"/>
+                            <Button Content="HTML Raporu Disa Aktar" Style="{StaticResource PrimaryButton}" Width="220" HorizontalAlignment="Left" Margin="0,14,0,0" Click="CreateReport_Click"/>
+                            <TextBlock Text="{Binding ReportPath}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#C9D1D9" Margin="0,14,0,0"/>
                         </StackPanel>
                     </Border>
                 </TabItem>
@@ -655,8 +934,8 @@
                     <Border Style="{StaticResource Card}" Margin="0,14,0,0">
                         <StackPanel>
                             <TextBlock Text="Ayarlar" Style="{StaticResource SectionTitle}"/>
-                            <TextBlock Text="Ilk MVP Turkce arayuzle gelir. Coklu dil, zamanlanmis tarama ve imzali yayinlama sonraki surum icin planlandi." Style="{StaticResource MutedText}"/>
-                            <TextBlock Text="Guvenlik siniri: Registry cleaner, sahte hizlandirma ve onaysiz kritik islem yoktur." Foreground="#dbe9f7" Margin="0,12,0,0"/>
+                            <TextBlock Text="ITCHY yerel analiz, kontrollu onarim ve teknisyen raporlama odakli calisir." Style="{StaticResource MutedText}"/>
+                            <TextBlock Text="Guvenlik siniri: Registry cleaner, sahte hizlandirma ve onaysiz kritik islem yoktur." Foreground="#C9D1D9" Margin="0,12,0,0"/>
                         </StackPanel>
                     </Border>
                 </TabItem>

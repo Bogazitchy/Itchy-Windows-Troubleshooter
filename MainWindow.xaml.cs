@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Security.Principal;
 using System.Text;
@@ -9,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using ItchyWindowsTroubleshooter.Models;
@@ -64,6 +66,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         DataContext = this;
         Loaded += MainWindow_Loaded;
         Closed += MainWindow_Closed;
+        SourceInitialized += (_, _) => ApplyWindowTheme();
         AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(DataGrid_PreviewMouseRightButtonDown), true);
         _temperatureTimer.Tick += TemperatureTimer_Tick;
         _ = RefreshProtectionAsync();
@@ -654,6 +657,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var principal = new WindowsPrincipal(identity);
         return principal.IsInRole(WindowsBuiltInRole.Administrator);
     }
+
+    private void ApplyWindowTheme()
+    {
+        try
+        {
+            var handle = new WindowInteropHelper(this).Handle;
+            var darkMode = 1;
+            if (DwmSetWindowAttribute(handle, 20, ref darkMode, sizeof(int)) != 0)
+            {
+                DwmSetWindowAttribute(handle, 19, ref darkMode, sizeof(int));
+            }
+
+            var borderColor = 0x003D3630;
+            var captionColor = 0x0017110D;
+            var textColor = 0x00FCF6F0;
+            DwmSetWindowAttribute(handle, 34, ref borderColor, sizeof(int));
+            DwmSetWindowAttribute(handle, 35, ref captionColor, sizeof(int));
+            DwmSetWindowAttribute(handle, 36, ref textColor, sizeof(int));
+        }
+        catch
+        {
+        }
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr windowHandle, int attribute, ref int value, int valueSize);
 
     private static bool IsTemperatureItem(SystemInfoItem item)
     {

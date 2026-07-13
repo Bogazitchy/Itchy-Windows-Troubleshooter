@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.0 - 2026-07-13
+
+### Improved
+
+- Uygulama genelinde daha okunakli, modern graphite tema.
+- Ana gezinme, panel hiyerarsisi ve tarama kontrolleri yeniden duzenlendi.
+- Buton, sekme, tablo, kaydirma cubugu ve durum renkleri iyilestirildi.
+- Windows baslik cubugu karanlik temayla uyumlu hale getirildi.
+- Sistem bilgileri tablosunda uzun donanim ve surucu adlarinin gorunurlugu artirildi.
+- Sag tik menuleri tamamen karanlik ve yuksek kontrastli hale getirildi.
+
+### Updated
+
+- README ekran goruntuleri yeni arayuzle yenilendi.
+
 ## 1.1.0 - 2026-07-10
 
 ### Added

@@ -69,7 +69,7 @@ Tablolar sabit baslikli ve kaydirilabilir yapidadir. Yazdirma veya PDF alma sira
 ## Kurulum
 
 1. [Releases](https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter/releases/latest) sayfasini acin.
-2. `ITCHY-Windows-Troubleshooter-v1.1.0-win-x64.exe` dosyasini indirin.
+2. `ITCHY-Windows-Troubleshooter-v1.2.0-win-x64.exe` dosyasini indirin.
 3. Uygulamayi calistirin. Korunan dump dosyalari ve sistem onarimlari icin **Yonetici olarak calistir** secenegini kullanin.
 4. Tam sembol/stack analizi icin Mavi Ekran sekmesindeki **WinDbg Kur / Guncelle** dugmesini kullanin.
 
