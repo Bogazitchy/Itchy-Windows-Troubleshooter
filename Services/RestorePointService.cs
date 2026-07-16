@@ -37,7 +37,12 @@ public sealed class RestorePointService
               Select-Object -First 30 @{N='CreatedAt';E={$_.ConvertToDateTime($_.CreationTime).ToString('o')}},Description,RestorePointType |
               ConvertTo-Json -Depth 3 -Compress
             """;
-        var result = await _runner.RunPowerShellAsync(script, cancellationToken, false, "Geri yukleme noktalari okunuyor");
+        var result = await _runner.RunPowerShellAsync(
+            script,
+            cancellationToken,
+            false,
+            "Geri yukleme noktalari okunuyor",
+            TimeSpan.FromSeconds(15));
         var output = result.Output;
         var json = output
             .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)

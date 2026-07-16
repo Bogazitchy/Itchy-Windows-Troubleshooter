@@ -33,9 +33,9 @@ public sealed class ReportService
             .metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:18px 0}.metric{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:13px}.metric b{display:block;font-size:23px}.metric span{color:var(--muted);font-size:13px}
             .layout{display:grid;grid-template-columns:230px minmax(0,1fr);gap:18px;align-items:start}.sidebar{position:sticky;top:14px;background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:10px}.search{width:100%;background:#09121b;color:var(--text);border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:10px}.tab-button{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;background:transparent;color:#c8d7e6;border:0;border-left:3px solid transparent;border-radius:4px;padding:10px;text-align:left;cursor:pointer}.tab-button:hover{background:#1b2b3d;color:#fff}.tab-button.active{background:#163651;border-left-color:var(--blue);color:#fff;font-weight:700}.tab-count{background:#26394d;color:#cfe5f8;border-radius:10px;padding:1px 7px;font-size:11px}.search-state{color:var(--muted);font-size:12px;padding:10px 7px 2px}
             .report-section{display:none;min-width:0}.report-section.active{display:block}.section-head{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:1px solid var(--line);padding:2px 0 12px;margin-bottom:14px}.section-head h2{margin:0;font-size:23px}.section-head p{margin:0;color:var(--muted)}
-            .card{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:16px;margin:0 0 12px}.card h3{margin:0 0 8px}.card p:last-child{margin-bottom:0}.summary-card{border-left:4px solid var(--blue)}.critical{color:var(--red)}.warning{color:var(--amber)}.info{color:var(--blue)}.success{color:var(--green)}
+            .card{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:16px;margin:0 0 12px}.card h3{margin:0 0 8px}.card p:last-child{margin-bottom:0}.summary-card{border-left:4px solid var(--blue)}.summary-card p{white-space:pre-line}.critical{color:var(--red)}.warning{color:var(--amber)}.info{color:var(--blue)}.success{color:var(--green)}.finding-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.finding-head h3{width:100%;margin-top:5px}.finding-meta{color:var(--muted);font-size:13px}.evidence-link{background:#173c57;color:#eef8ff;border:1px solid #346b8f;border-radius:5px;padding:7px 10px;cursor:pointer}.evidence-link:hover{background:#205477}.finding-actions{display:flex;justify-content:flex-end;margin-top:12px}
             .table-shell{border:1px solid var(--line);border-radius:7px;overflow:auto;max-height:70vh;margin:0 0 22px;background:var(--panel)}table{width:100%;border-collapse:collapse;font-size:13px}th{position:sticky;top:0;background:#203247;color:#fff;z-index:1}td,th{border-bottom:1px solid var(--line);padding:9px 10px;text-align:left;vertical-align:top}tbody tr:nth-child(even){background:#142130}tbody tr:hover{background:#1d3247}.table-title{display:flex;align-items:center;justify-content:space-between;margin:20px 0 8px}.table-title h3{margin:0}.pill{color:var(--cyan);font-size:12px;border:1px solid #2d625f;border-radius:10px;padding:2px 8px}
-            pre{white-space:pre-wrap;overflow:auto;background:#081018;border:1px solid var(--line);padding:12px;border-radius:7px;color:#dce8f5;max-height:70vh}details{margin-top:12px}summary{cursor:pointer;color:var(--blue);font-weight:600}.dump-grid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:7px 14px}.label{color:var(--muted)}[hidden]{display:none!important}.empty{color:var(--muted);padding:18px;text-align:center}
+            pre{white-space:pre-wrap;overflow:auto;background:#081018;border:1px solid var(--line);padding:12px;border-radius:7px;color:#dce8f5;max-height:70vh}details{margin-top:12px}summary{cursor:pointer;color:var(--blue);font-weight:600}.raw-block{background:var(--panel);border:1px solid var(--line);border-radius:7px;padding:12px;margin:12px 0}.raw-block>.table-title{margin-top:16px}.dump-grid{display:grid;grid-template-columns:180px minmax(0,1fr);gap:7px 14px}.label{color:var(--muted)}[hidden]{display:none!important}.empty{color:var(--muted);padding:18px;text-align:center}
             @media(max-width:900px){.wrap{padding:14px}.metrics{grid-template-columns:repeat(2,1fr)}.layout{grid-template-columns:1fr}.sidebar{position:static;display:grid;grid-template-columns:repeat(2,1fr);gap:5px}.search,.search-state{grid-column:1/-1}.dump-grid{grid-template-columns:1fr}.label{font-weight:700;margin-top:8px}}
             @media print{body{background:#fff;color:#111}.wrap{max-width:none;padding:0}.sidebar{display:none}.layout{display:block}.report-section{display:block!important;break-before:page}.report-section:first-child{break-before:auto}.card,.table-shell,pre{background:#fff;color:#111;border-color:#bbb;max-height:none;overflow:visible}th{position:static;background:#ddd;color:#111}.hero-meta,.section-head p,.label{color:#444}}
             </style></head><body><div class="wrap">
@@ -52,6 +52,7 @@ public sealed class ReportService
         AppendTabButton(html, "findings", "Bulgular", s.Findings.Count, false);
         AppendTabButton(html, "bsod", "Mavi Ekran", s.DumpAnalyses.Count + s.BlueScreens.Count, false);
         AppendTabButton(html, "errors", "Hata Kayitlari", s.DiagnosticLogs.Count + s.Events.Count, false);
+        AppendTabButton(html, "health", "Saglik ve Kapsam", s.HealthChecks.Count + s.ScanCoverage.Count, false);
         AppendTabButton(html, "reliability", "Guvenilirlik", s.ReliabilityRecords.Count, false);
         AppendTabButton(html, "system", "Sistem", s.SystemDetails.Count + s.Drivers.Count + s.ResourceMetrics.Count, false);
         AppendTabButton(html, "protection", "Koruma ve Onarim", s.RestorePoints.Count + s.RepairHistory.Count, false);
@@ -61,15 +62,27 @@ public sealed class ReportService
         BeginSection(html, "overview", "Genel Bakis", "Teknisyen icin en onemli sonuclar", true);
         html.AppendLine($"<article class='card summary-card' data-searchable><h3>Analiz Sonucu</h3><p>{E(s.AnalysisSummary)}</p></article>");
         html.AppendLine($"<article class='card' data-searchable><h3>Mavi Ekran Ozeti</h3><p>{E(s.BlueScreenSummary)}</p></article>");
-        html.AppendLine($"<article class='card' data-searchable><h3>Sistem Ozeti</h3><pre>{E(s.SystemInfo)}</pre></article>");
+        html.AppendLine($"<details class='raw-block'><summary>Sistem ozetini goster</summary><pre data-searchable>{E(s.SystemInfo)}</pre></details>");
         EndSection(html);
 
         BeginSection(html, "findings", "Oncelikli Bulgular", "Kritik ve uyari seviyesindeki ayiklanmis sonuclar");
-        foreach (var finding in s.Findings)
+        var rankedFindings = s.Findings
+            .OrderBy(GetFindingReportPriority)
+            .ThenByDescending(x => x.ConfidenceScore)
+            .ThenBy(x => x.Severity)
+            .ThenByDescending(x => x.LatestOccurrence)
+            .ToList();
+        foreach (var finding in rankedFindings.Take(3))
         {
-            html.AppendLine($"<article class='card' data-searchable><b class='{finding.Severity.ToString().ToLowerInvariant()}'>{E(finding.Severity.ToString())}</b><h3>{E(finding.Title)}</h3><p><b>Muhtemel Sebep:</b> {E(finding.Cause)}</p><p><b>Kanit:</b> {E(finding.Evidence)}</p><p><b>Onerilen Islem:</b> {E(finding.Recommendation)}</p></article>");
+            AppendFindingCard(html, finding);
         }
-        if (s.Findings.Count == 0) html.AppendLine("<div class='card empty'>Bulgu kaydi yok.</div>");
+        if (rankedFindings.Count > 3)
+        {
+            html.AppendLine($"<details class='raw-block'><summary>Diger {rankedFindings.Count - 3} bulguyu goster</summary>");
+            foreach (var finding in rankedFindings.Skip(3)) AppendFindingCard(html, finding);
+            html.AppendLine("</details>");
+        }
+        if (rankedFindings.Count == 0) html.AppendLine("<div class='card empty'>Bulgu kaydi yok.</div>");
         EndSection(html);
 
         BeginSection(html, "bsod", "Mavi Ekran ve Dump", "Stop code, surucu, stack ve olay korelasyonu");
@@ -79,12 +92,31 @@ public sealed class ReportService
         EndSection(html);
 
         BeginSection(html, "errors", "Hata Kayitlari", "Ayiklanmis sorunlar ve ham Event Viewer verileri");
+        var diagnosticGroups = GroupDiagnosticLogs(s.DiagnosticLogs);
+        AppendTable(html, "Bilesene Gore Gruplanmis Hatalar", ["Son Kayit", "Kategori", "Bilesen", "Kaynak / Kod", "Tekrar", "Ornek Kanit"], diagnosticGroups.Select(x => new[] { x.Latest?.ToString("dd.MM.yyyy HH:mm") ?? "", x.Category, x.Component, $"{x.Source} / {x.Code}", x.Count.ToString(), x.Sample }));
+        html.AppendLine("<details class='raw-block'><summary>Ayiklanan tekil hata kayitlarini goster</summary>");
         AppendTable(html, "Ayiklanan Hata Kayitlari", ["Zaman", "Kategori", "Bilesen", "Kaynak", "Kod", "Ozet"], s.DiagnosticLogs.Select(x => new[] { x.TimeCreated?.ToString("dd.MM.yyyy HH:mm") ?? "", x.Category, x.Component, x.Source, x.Code, x.Summary }));
+        html.AppendLine("</details><details class='raw-block'><summary>Ham Event Viewer kayitlarini goster</summary>");
         AppendTable(html, "Event Viewer Ozeti", ["Zaman", "Log", "Kaynak", "ID", "Mesaj"], s.Events.Select(x => new[] { x.TimeCreated?.ToString("dd.MM.yyyy HH:mm") ?? "", x.LogName, x.Provider, x.Id.ToString(), x.Message }));
+        html.AppendLine("</details>");
+        EndSection(html);
+
+        BeginSection(html, "health", "Saglik Denetimleri ve Tarama Kapsami", "Disk, bellek, dump, Windows sagligi ve okunabilen veri kaynaklari");
+        AppendTable(html, "Sistem Saglik Denetimleri", ["Zaman", "Kategori", "Bilesen", "Durum", "Deger", "Kanit / Aciklama"], s.HealthChecks.Select(x => new[] { x.ObservedAt?.ToString("dd.MM.yyyy HH:mm") ?? "", x.Category, x.Component, x.Status, x.Value, x.Detail }));
+        AppendTable(html, "Tarama Kapsami", ["Veri Kaynagi", "Durum", "Kayit", "Kapsam Detayi"], s.ScanCoverage.Select(x => new[] { x.Source, x.Status, x.RecordCount.ToString(), x.Detail }));
         EndSection(html);
 
         BeginSection(html, "reliability", "Guvenilirlik Gecmisi", "Uygulama, guncelleme ve sistem kararliligi kayitlari");
+        var reliabilityGroups = s.ReliabilityRecords
+            .GroupBy(x => $"{x.SourceName}\u001f{x.ProductName}", StringComparer.OrdinalIgnoreCase)
+            .Select(x => new { Item = x.OrderByDescending(y => y.TimeGenerated).First(), Count = x.Count(), Latest = x.Max(y => y.TimeGenerated) })
+            .OrderByDescending(x => x.Count)
+            .ThenByDescending(x => x.Latest)
+            .ToList();
+        AppendTable(html, "Urun ve Kaynaga Gore Gruplanmis Kayitlar", ["Son Kayit", "Kaynak", "Urun", "Tekrar", "Ornek Mesaj"], reliabilityGroups.Select(x => new[] { x.Latest?.ToString("dd.MM.yyyy HH:mm") ?? "", x.Item.SourceName, x.Item.ProductName, x.Count.ToString(), x.Item.Message }));
+        html.AppendLine("<details class='raw-block'><summary>Tum Reliability Monitor kayitlarini goster</summary>");
         AppendTable(html, "Reliability Monitor Ozeti", ["Zaman", "Kaynak", "Urun", "Mesaj"], s.ReliabilityRecords.Select(x => new[] { x.TimeGenerated?.ToString("dd.MM.yyyy HH:mm") ?? "", x.SourceName, x.ProductName, x.Message }));
+        html.AppendLine("</details>");
         EndSection(html);
 
         BeginSection(html, "system", "Sistem ve Suruculer", "Donanim envanteri, surumler ve kaynak kullanimi");
@@ -100,16 +132,16 @@ public sealed class ReportService
         EndSection(html);
 
         BeginSection(html, "logs", "Ham Uygulama Logu", "Tarama ve komut calistirma gecmisi");
-        html.AppendLine($"<pre data-searchable>{E(s.LogText)}</pre>");
+        html.AppendLine($"<details class='raw-block'><summary>Ham uygulama logunu goster</summary><pre data-searchable>{E(s.LogText)}</pre></details>");
         EndSection(html);
 
         html.AppendLine("""
             </main></div></div>
             <script>
             (()=>{const buttons=[...document.querySelectorAll('.tab-button')],sections=[...document.querySelectorAll('.report-section')],search=document.getElementById('reportSearch'),state=document.getElementById('searchState');
-            const activate=id=>{buttons.forEach(b=>b.classList.toggle('active',b.dataset.tab===id));sections.forEach(s=>s.classList.toggle('active',s.id===id));location.hash=id==='overview'?'':id;search.value='';filter();};
+            const activate=(id,query='')=>{buttons.forEach(b=>b.classList.toggle('active',b.dataset.tab===id));sections.forEach(s=>s.classList.toggle('active',s.id===id));location.hash=id==='overview'?'':id;search.value=query;filter();};
             const filter=()=>{const active=document.querySelector('.report-section.active');if(!active)return;const q=search.value.trim().toLocaleLowerCase('tr-TR'),items=[...active.querySelectorAll('[data-searchable]')];let shown=0;items.forEach(item=>{const visible=!q||item.innerText.toLocaleLowerCase('tr-TR').includes(q);item.hidden=!visible;if(visible)shown++;});state.textContent=q?shown+' eslesen kayit':'Bu sekmede '+items.length+' aranabilir kayit';};
-            buttons.forEach(b=>b.addEventListener('click',()=>activate(b.dataset.tab)));search.addEventListener('input',filter);const initial=location.hash.slice(1);activate(sections.some(s=>s.id===initial)?initial:'overview');})();
+            buttons.forEach(b=>b.addEventListener('click',()=>activate(b.dataset.tab)));document.querySelectorAll('[data-evidence-query]').forEach(b=>b.addEventListener('click',()=>{document.querySelectorAll('#errors details').forEach(d=>d.open=true);activate('errors',b.dataset.evidenceQuery||'');}));search.addEventListener('input',filter);const initial=location.hash.slice(1);activate(sections.some(s=>s.id===initial)?initial:'overview');})();
             </script></body></html>
             """);
         return html.ToString();
@@ -133,7 +165,11 @@ public sealed class ReportService
         text.AppendLine("Bulgular");
         foreach (var finding in s.Findings)
         {
-            text.AppendLine($"[{finding.Severity}] {finding.Title}");
+            text.AppendLine($"[{finding.SeverityText}] {finding.Title} - Guven %{finding.ConfidenceScore} ({finding.Confidence})");
+            text.AppendLine($"Bilesen / Rol: {finding.Component} / {finding.Role}");
+            text.AppendLine($"Guncellik / Tekrar / Kaynak: {finding.RecencyText} / {finding.OccurrenceCount} / {finding.IndependentSourceCount}");
+            text.AppendLine($"Mavi Ekran Iliskisi: {finding.CrashRelation}");
+            text.AppendLine($"Kanit Korelasyonu: {finding.Correlation}");
             text.AppendLine($"Muhtemel Sebep: {finding.Cause}");
             text.AppendLine($"Kanit: {finding.Evidence}");
             text.AppendLine($"Onerilen Islem: {finding.Recommendation}");
@@ -164,10 +200,31 @@ public sealed class ReportService
         }
 
         text.AppendLine();
-        text.AppendLine("Ayiklanan Hata Kayitlari");
+        text.AppendLine("Bilesene Gore Gruplanmis Hatalar");
+        foreach (var group in GroupDiagnosticLogs(s.DiagnosticLogs))
+        {
+            text.AppendLine($"{group.Latest:dd.MM.yyyy HH:mm} [{group.Category}] {group.Component} - {group.Source} / {group.Code} - {group.Count} tekrar - {group.Sample}");
+        }
+
+        text.AppendLine();
+        text.AppendLine("Ayiklanan Tekil Hata Kayitlari");
         foreach (var item in s.DiagnosticLogs)
         {
             text.AppendLine($"{item.TimeCreated:dd.MM.yyyy HH:mm} [{item.Category}] {item.Component} - {item.Source} / {item.Code} - {item.Summary}");
+        }
+
+        text.AppendLine();
+        text.AppendLine("Sistem Saglik Denetimleri");
+        foreach (var item in s.HealthChecks)
+        {
+            text.AppendLine($"{item.ObservedAt:dd.MM.yyyy HH:mm} [{item.Category}] {item.Component} - {item.Status} - {item.Value} - {item.Detail}");
+        }
+
+        text.AppendLine();
+        text.AppendLine("Tarama Kapsami");
+        foreach (var item in s.ScanCoverage)
+        {
+            text.AppendLine($"{item.Source}: {item.Status}, {item.RecordCount} kayit - {item.Detail}");
         }
 
         text.AppendLine();
@@ -220,6 +277,55 @@ public sealed class ReportService
         text.AppendLine("Log");
         text.AppendLine(s.LogText);
         return text.ToString();
+    }
+
+    private static void AppendFindingCard(StringBuilder html, Finding finding)
+    {
+        html.AppendLine("<article class='card' data-searchable>");
+        html.AppendLine($"<div class='finding-head'><b class='{finding.Severity.ToString().ToLowerInvariant()}'>{E(finding.SeverityText)}</b><span class='pill'>Guven %{finding.ConfidenceScore} - {E(finding.Confidence)}</span><h3>{E(finding.Title)}</h3></div>");
+        html.AppendLine($"<p class='finding-meta'><b>Bilesen:</b> {E(finding.Component)} | <b>Rol:</b> {E(finding.Role)} | <b>Guncellik:</b> {E(finding.RecencyText)} | <b>Tekrar:</b> {finding.OccurrenceCount} | <b>Bagimsiz kaynak:</b> {finding.IndependentSourceCount}</p>");
+        html.AppendLine($"<p><b>Mavi ekran iliskisi:</b> {E(finding.CrashRelation)}</p><p><b>Kanit korelasyonu:</b> {E(finding.Correlation)}</p><p><b>Muhtemel Sebep:</b> {E(finding.Cause)}</p><p><b>Kanit:</b> {E(finding.Evidence)}</p><p><b>Onerilen Islem:</b> {E(finding.Recommendation)}</p>");
+        if (!string.IsNullOrWhiteSpace(finding.SearchKey))
+        {
+            html.AppendLine($"<div class='finding-actions'><button type='button' class='evidence-link' data-evidence-query='{E(finding.SearchKey)}'>Ilgili kayitlari ac</button></div>");
+        }
+
+        html.AppendLine("</article>");
+    }
+
+    private static int GetFindingReportPriority(Finding finding)
+    {
+        return finding.Role switch
+        {
+            "Dogrudan Ariza" => 0,
+            "Kok Neden Adayi" => 1,
+            "Yapilandirma" => 2,
+            "Cokme Kaniti" => 3,
+            "Sonuc Olayi" => 4,
+            "Izleme Bulgusu" or "Anlik Olcum" => 5,
+            _ => 6
+        };
+    }
+
+    private static IReadOnlyList<DiagnosticGroup> GroupDiagnosticLogs(IReadOnlyList<DiagnosticLogItem> logs)
+    {
+        return logs
+            .GroupBy(x => $"{x.Category}\u001f{x.Component}\u001f{x.Source}\u001f{x.Code}", StringComparer.OrdinalIgnoreCase)
+            .Select(group =>
+            {
+                var latest = group.OrderByDescending(x => x.TimeCreated).First();
+                return new DiagnosticGroup(
+                    latest.TimeCreated,
+                    latest.Category,
+                    latest.Component,
+                    latest.Source,
+                    latest.Code,
+                    group.Count(),
+                    latest.Summary);
+            })
+            .OrderByDescending(x => x.Count)
+            .ThenByDescending(x => x.Latest)
+            .ToList();
     }
 
     private static void AppendTable(StringBuilder html, string title, string[] headers, IEnumerable<string[]> rows)
@@ -309,6 +415,15 @@ public sealed class ReportService
     {
         html.AppendLine($"<div class='label'>{E(label)}</div><div>{E(value)}</div>");
     }
+
+    private sealed record DiagnosticGroup(
+        DateTime? Latest,
+        string Category,
+        string Component,
+        string Source,
+        string Code,
+        int Count,
+        string Sample);
 
     private static string E(string? value) => WebUtility.HtmlEncode(value ?? "");
 }

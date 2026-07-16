@@ -485,19 +485,19 @@
                             <TextBlock Text="{Binding AdminStatus}" Foreground="{StaticResource MutedBrush}" Margin="0,8,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
-                    <Button Click="StartScan_Click" Style="{StaticResource PrimaryButton}">
+                    <Button Click="StartScan_Click" Style="{StaticResource PrimaryButton}" IsEnabled="{Binding IsIdle}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE768;" FontSize="15" Margin="0,0,8,0"/>
                             <TextBlock Text="Taramayi Baslat"/>
                         </StackPanel>
                     </Button>
-                    <Button Click="Cancel_Click" Style="{StaticResource DangerButton}">
+                    <Button Click="Cancel_Click" Style="{StaticResource DangerButton}" IsEnabled="{Binding IsBusy}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE711;" FontSize="14" Margin="0,0,8,0"/>
                             <TextBlock Text="Taramayi Iptal Et"/>
                         </StackPanel>
                     </Button>
-                    <Button Click="CreateReport_Click">
+                    <Button Click="CreateReport_Click" IsEnabled="{Binding IsIdle}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE74E;" FontSize="14" Margin="0,0,8,0"/>
                             <TextBlock Text="HTML Raporu Disa Aktar"/>
@@ -539,6 +539,7 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,0,0">
                     <TextBlock Text="WINDOWS 10 / 11" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding ScanStage}" Foreground="{StaticResource CyanBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" TextWrapping="Wrap" MaxWidth="280" Margin="0,0,0,6"/>
                     <ProgressBar Width="220" Height="7" IsIndeterminate="{Binding IsBusy}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"/>
                 </StackPanel>
             </Grid>
@@ -603,9 +604,26 @@
                                             <Border Background="{StaticResource ElevatedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,10">
                                                 <StackPanel>
                                                     <DockPanel>
-                                                        <TextBlock Text="{Binding Severity}" FontWeight="Bold" Foreground="{Binding SeverityBrush}" Margin="0,0,12,0"/>
+                                                        <Border DockPanel.Dock="Right" Background="#21262D" BorderBrush="{Binding ConfidenceBrush}" BorderThickness="1" CornerRadius="4" Padding="8,3" Margin="10,0,0,0">
+                                                            <TextBlock Foreground="{Binding ConfidenceBrush}" FontSize="11" FontWeight="Bold">
+                                                                <Run Text="GUVEN "/><Run Text="%"/><Run Text="{Binding ConfidenceScore, Mode=OneWay}"/>
+                                                            </TextBlock>
+                                                        </Border>
+                                                        <TextBlock Text="{Binding SeverityText}" FontWeight="Bold" Foreground="{Binding SeverityBrush}" Margin="0,0,12,0"/>
                                                         <TextBlock Text="{Binding Title}" FontWeight="Bold" FontSize="16" TextWrapping="Wrap"/>
                                                     </DockPanel>
+                                                    <TextBlock Foreground="{StaticResource CyanBrush}" FontSize="12" FontWeight="SemiBold" Margin="0,6,0,0" TextWrapping="Wrap">
+                                                        <Run Text="{Binding Component, Mode=OneWay}"/><Run Text="  |  "/><Run Text="{Binding Role, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                    <TextBlock Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap">
+                                                        <Run Text="Guncellik: "/><Run Text="{Binding RecencyText, Mode=OneWay}"/><Run Text="  |  Tekrar: "/><Run Text="{Binding OccurrenceCount, Mode=OneWay}"/><Run Text="  |  Bagimsiz kaynak: "/><Run Text="{Binding IndependentSourceCount, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                    <TextBlock Foreground="{Binding ConfidenceBrush}" FontSize="12" Margin="0,6,0,0" TextWrapping="Wrap">
+                                                        <Run Text="Kanit korelasyonu: "/><Run Text="{Binding Correlation, Mode=OneWay}"/>
+                                                    </TextBlock>
+                                                    <TextBlock Foreground="{StaticResource MutedBrush}" FontSize="12" Margin="0,4,0,0" TextWrapping="Wrap">
+                                                        <Run Text="Mavi ekran iliskisi: "/><Run Text="{Binding CrashRelation, Mode=OneWay}"/>
+                                                    </TextBlock>
                                                     <TextBlock Text="{Binding Cause}" Style="{StaticResource CopyableText}" Foreground="#C9D1D9" TextWrapping="Wrap" Margin="0,7,0,0"/>
                                                     <TextBlock Text="{Binding Evidence}" Style="{StaticResource CopyableText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,7,0,0"/>
                                                     <TextBlock Text="{Binding Recommendation}" Style="{StaticResource CopyableText}" Foreground="#C9D1D9" TextWrapping="Wrap" Margin="0,7,0,0"/>
@@ -788,7 +806,7 @@
                                 <TextBlock Text="Windows Hata Analizi" Style="{StaticResource SectionTitle}"/>
                                 <TextBlock Text="Ayiklanan Sorunlar bolumu uygulama, surucu, aygit ve Windows bilesenlerini adiyla gosterir. Ham Olay Kayitlari bolumu incelenen Event Viewer kayitlarini tek tek saklar." Style="{StaticResource MutedText}"/>
                                 <WrapPanel Margin="0,12,0,0">
-                                    <Button Content="Tam Taramayi Baslat" Click="StartScan_Click" Style="{StaticResource PrimaryButton}"/>
+                                    <Button Content="Tam Taramayi Baslat" Click="StartScan_Click" Style="{StaticResource PrimaryButton}" IsEnabled="{Binding IsIdle}"/>
                                     <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
                                 </WrapPanel>
                             </StackPanel>
@@ -803,6 +821,28 @@
                                         <DataGridTextColumn Header="Kaynak" Binding="{Binding Source}" Width="220"/>
                                         <DataGridTextColumn Header="Kod" Binding="{Binding Code}" Width="100"/>
                                         <DataGridTextColumn Header="Hata Ozeti" Binding="{Binding Summary}" Width="*"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </TabItem>
+                            <TabItem Header="Saglik Denetimleri">
+                                <DataGrid ItemsSource="{Binding HealthChecks}" AutoGenerateColumns="False" Margin="0,10,0,0">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Zaman" Binding="{Binding ObservedAt, StringFormat=dd.MM.yyyy HH:mm:ss}" Width="150"/>
+                                        <DataGridTextColumn Header="Kategori" Binding="{Binding Category}" Width="130"/>
+                                        <DataGridTextColumn Header="Bilesen" Binding="{Binding Component}" Width="220"/>
+                                        <DataGridTextColumn Header="Durum" Binding="{Binding Status}" Width="100"/>
+                                        <DataGridTextColumn Header="Deger" Binding="{Binding Value}" Width="190"/>
+                                        <DataGridTextColumn Header="Kanit / Aciklama" Binding="{Binding Detail}" Width="*"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </TabItem>
+                            <TabItem Header="Tarama Kapsami">
+                                <DataGrid ItemsSource="{Binding ScanCoverage}" AutoGenerateColumns="False" Margin="0,10,0,0">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Veri Kaynagi" Binding="{Binding Source}" Width="230"/>
+                                        <DataGridTextColumn Header="Durum" Binding="{Binding Status}" Width="120"/>
+                                        <DataGridTextColumn Header="Kayit" Binding="{Binding RecordCount}" Width="80"/>
+                                        <DataGridTextColumn Header="Kapsam Detayi" Binding="{Binding Detail}" Width="*"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </TabItem>

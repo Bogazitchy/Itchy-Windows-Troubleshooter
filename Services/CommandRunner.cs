@@ -17,7 +17,8 @@ public sealed class CommandRunner
         string script,
         CancellationToken cancellationToken,
         bool streamOutput = true,
-        string? displayCommand = null)
+        string? displayCommand = null,
+        TimeSpan? timeout = null)
     {
         var preparedScript = "[Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false); " +
                              "$OutputEncoding = [System.Text.UTF8Encoding]::new($false); " +
@@ -30,7 +31,7 @@ public sealed class CommandRunner
             displayCommand ?? script,
             cancellationToken,
             streamOutput,
-            null);
+            timeout);
     }
 
     public Task<CommandResult> RunCmdAsync(string command, CancellationToken cancellationToken)
@@ -127,7 +128,11 @@ public sealed class CommandRunner
             {
             }
 
-            var timeoutMessage = $"{displayCommand} zaman asimina ugradi ({timeout.GetValueOrDefault().TotalMinutes:N0} dakika).";
+            var duration = timeout.GetValueOrDefault();
+            var durationText = duration.TotalMinutes >= 1
+                ? $"{duration.TotalMinutes:N0} dakika"
+                : $"{duration.TotalSeconds:N0} saniye";
+            var timeoutMessage = $"{displayCommand} zaman asimina ugradi ({durationText}).";
             await _log(timeoutMessage);
             output.AppendLine(timeoutMessage);
             return new CommandResult(displayCommand, -1, output.ToString(), false);

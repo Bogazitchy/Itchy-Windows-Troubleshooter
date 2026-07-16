@@ -48,6 +48,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _protectionStatus = "Durum henuz okunmadi.";
     private string _reportPath = "";
     private string _temperatureRefreshText = "Sistem bilgileri yukleniyor...";
+    private string _scanStage = "Hazir";
     private bool _isBusy;
     private int _criticalCount;
     private int _warningCount;
@@ -65,6 +66,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         AdminStatus = IsAdministrator() ? "Yonetici izni: Var" : "Yonetici izni: Yok. Bazi onarimlar icin yonetici olarak calistirin.";
         DataContext = this;
         Loaded += MainWindow_Loaded;
+        Closing += MainWindow_Closing;
         Closed += MainWindow_Closed;
         SourceInitialized += (_, _) => ApplyWindowTheme();
         AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(DataGrid_PreviewMouseRightButtonDown), true);
@@ -78,6 +80,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public ObservableCollection<EventRecordItem> EventItems { get; } = new();
     public ObservableCollection<ReliabilityRecordItem> ReliabilityItems { get; } = new();
     public ObservableCollection<DiagnosticLogItem> DiagnosticItems { get; } = new();
+    public ObservableCollection<HealthCheckItem> HealthChecks { get; } = new();
+    public ObservableCollection<ScanCoverageItem> ScanCoverage { get; } = new();
     public ObservableCollection<SystemInfoItem> SystemDetails { get; } = new();
     public ObservableCollection<DriverInfoItem> DriverItems { get; } = new();
     public ObservableCollection<ResourceMetricItem> ResourceMetrics { get; } = new();
@@ -96,7 +100,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string ProtectionStatus { get => _protectionStatus; set => SetField(ref _protectionStatus, value); }
     public string ReportPath { get => _reportPath; set => SetField(ref _reportPath, value); }
     public string TemperatureRefreshText { get => _temperatureRefreshText; set => SetField(ref _temperatureRefreshText, value); }
-    public bool IsBusy { get => _isBusy; set => SetField(ref _isBusy, value); }
+    public string ScanStage { get => _scanStage; set => SetField(ref _scanStage, value); }
+    public bool IsBusy
+    {
+        get => _isBusy;
+        set
+        {
+            if (_isBusy == value) return;
+            _isBusy = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsBusy)));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsIdle)));
+        }
+    }
+    public bool IsIdle => !IsBusy;
     public int CriticalCount { get => _criticalCount; set => SetField(ref _criticalCount, value); }
     public int WarningCount { get => _warningCount; set => SetField(ref _warningCount, value); }
     public int InfoCount { get => _infoCount; set => SetField(ref _infoCount, value); }
@@ -114,6 +130,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         _temperatureTimer.Stop();
         _cts?.Cancel();
+    }
+
+    private void MainWindow_Closing(object? sender, CancelEventArgs e)
+    {
+        if (!IsBusy)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        AppendLog("Tarama devam ederken pencere kapatma istegi engellendi. Once taramayi iptal edin.");
     }
 
     private async void TemperatureTimer_Tick(object? sender, EventArgs e)
@@ -185,7 +212,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             AppendLog("Genel sistem taramasi basladi.");
             var result = await _analysisService.RunGeneralScanAsync(token);
             ApplyResult(result);
-            await RefreshProtectionAsync();
         });
     }
 
@@ -362,6 +388,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 EventItems.ToList(),
                 ReliabilityItems.ToList(),
                 DiagnosticItems.ToList(),
+                HealthChecks.ToList(),
+                ScanCoverage.ToList(),
                 SystemDetails.ToList(),
                 DriverItems.ToList(),
                 ResourceMetrics.ToList(),
@@ -527,10 +555,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         catch (OperationCanceledException)
         {
+            ScanStage = "Tarama iptal edildi";
             AppendLog("Islem iptal edildi.");
         }
         catch (Exception ex)
         {
+            ScanStage = "Tarama hatayla durdu";
             AppendLog($"Hata: {ex.Message}");
             MessageBox.Show(ex.Message, "Hata", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -574,6 +604,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             DiagnosticItems.Add(item);
         }
 
+        foreach (var item in result.HealthChecks)
+        {
+            HealthChecks.Add(item);
+        }
+
+        foreach (var item in result.ScanCoverage)
+        {
+            ScanCoverage.Add(item);
+        }
+
         ReplaceCollection(SystemDetails, result.SystemDetails);
         ReplaceCollection(DriverItems, result.Drivers);
 
@@ -585,13 +625,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         CriticalCount = result.Findings.Count(x => x.Severity == Severity.Critical);
         WarningCount = result.Findings.Count(x => x.Severity == Severity.Warning);
         InfoCount = result.Findings.Count(x => x.Severity == Severity.Info);
-        SystemStatus = CriticalCount > 0 ? "Dikkat Gerekli" : WarningCount > 0 ? "Orta" : "Iyi";
-        HeaderSummary = $"{CriticalCount} kritik bulgu, {WarningCount} uyari ve {InfoCount} bilgi bulundu.";
+        var strongRootCause = result.Findings.Any(x => x.IsRootCauseCandidate && x.Severity == Severity.Critical && x.ConfidenceScore >= 70);
+        var reviewCandidate = result.Findings.Any(x => x.IsRootCauseCandidate && x.Severity is Severity.Critical or Severity.Warning && x.ConfidenceScore >= 55);
+        var hasActionableFinding = result.Findings.Any(x => x.Severity != Severity.Success);
+        SystemStatus = strongRootCause ? "Dikkat Gerekli" : reviewCandidate ? "Incelenmeli" : hasActionableFinding ? "Izlenmeli" : "Iyi";
+        var coverageScore = result.ScanCoverage.Count == 0
+            ? 0
+            : (int)Math.Round(result.ScanCoverage.Sum(x => x.Status == "Tamamlandi" ? 1.0 : x.Status == "Kismi" ? 0.5 : 0) / result.ScanCoverage.Count * 100);
+        HeaderSummary = $"{CriticalCount} kritik bulgu, {WarningCount} uyari, {InfoCount} bilgi. Tarama kapsami %{coverageScore}.";
         AnalysisSummary = result.UserSummary;
         BlueScreenSummary = result.BlueScreenSummary;
         LastScanText = DateTime.Now.ToString("dd.MM.yyyy HH:mm");
         SystemInfoText = result.SystemInfo;
         TemperatureRefreshText = $"Sicakliklar her dakika yenilenir. Son yenileme: {DateTime.Now:HH:mm:ss}";
+        ScanStage = "Tarama tamamlandi";
         AppendLog("Genel sistem taramasi tamamlandi.");
     }
 
@@ -614,10 +661,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         EventItems.Clear();
         ReliabilityItems.Clear();
         DiagnosticItems.Clear();
+        HealthChecks.Clear();
+        ScanCoverage.Clear();
         ResourceMetrics.Clear();
         CriticalCount = 0;
         WarningCount = 0;
         InfoCount = 0;
+        ScanStage = "Tarama hazirlaniyor";
         AnalysisSummary = "Tarama calisiyor. Event Viewer, Guvenilirlik Gecmisi, kaynak kullanimi, aygitlar, suruculer ve donanim sensorleri okunuyor.";
         BlueScreenSummary = "Dump dosyalari, stop code, semboller, stack ve olay korelasyonu analiz ediliyor.";
     }
@@ -640,8 +690,29 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private Task AppendLogAsync(string text)
     {
-        Dispatcher.Invoke(() => AppendLog(text));
+        Dispatcher.Invoke(() =>
+        {
+            var stage = ResolveScanStage(text);
+            if (!string.IsNullOrWhiteSpace(stage))
+            {
+                ScanStage = stage;
+            }
+
+            AppendLog(text);
+        });
         return Task.CompletedTask;
+    }
+
+    private static string? ResolveScanStage(string text)
+    {
+        if (text.Contains("Genel tarama", StringComparison.OrdinalIgnoreCase)) return "Tarama kaynaklari hazirlaniyor";
+        if (text.Contains("Event Viewer", StringComparison.OrdinalIgnoreCase) || text.Contains("olay kayit", StringComparison.OrdinalIgnoreCase)) return "Olay kayitlari okunuyor";
+        if (text.Contains("Reliability", StringComparison.OrdinalIgnoreCase) || text.Contains("Guvenilirlik", StringComparison.OrdinalIgnoreCase)) return "Guvenilirlik gecmisi okunuyor";
+        if (text.Contains("Aygit Yoneticisi", StringComparison.OrdinalIgnoreCase) || text.Contains("surucu envanteri", StringComparison.OrdinalIgnoreCase)) return "Aygit ve suruculer kontrol ediliyor";
+        if (text.Contains("kaynak", StringComparison.OrdinalIgnoreCase) || text.Contains("performans", StringComparison.OrdinalIgnoreCase)) return "Kaynak kullanimi ornekleniyor";
+        if (text.Contains("saglik", StringComparison.OrdinalIgnoreCase) || text.Contains("DISM", StringComparison.OrdinalIgnoreCase)) return "Sistem sagligi denetleniyor";
+        if (text.Contains("dump", StringComparison.OrdinalIgnoreCase) || text.Contains("Mavi ekran", StringComparison.OrdinalIgnoreCase)) return "Dump ve cokme kayitlari analiz ediliyor";
+        return null;
     }
 
     private void AppendLog(string text)

@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.3.0 - 2026-07-16
+
+### Added
+
+- Bulgular icin 0-100 guven puani ve kanit korelasyonu.
+- Disk/SMART, pagefile, dump ayari, Windows Bellek Tanilama, bekleyen yeniden baslatma ve DISM CheckHealth denetimleri.
+- Uygulama ve raporlarda Saglik Denetimleri ile Tarama Kapsami bolumleri.
+- Code Integrity ve Defender olaylarinda sorunlu modul/tehdit ayristirma.
+
+### Improved
+
+- Event Viewer taramasi WHEA, depolama, GPU, Kernel-PnP, surucu altyapisi, Code Integrity, Defender ve performans kanallariyla genisletildi.
+- WHEA duzeltilmis/duzeltilemeyen olaylari, Kernel-Power sonuc kayitlari ve volmgr dump yazma hatalari ayri degerlendiriliyor.
+- Kaynak kullanimi uc yerine bes orneklem ve ortalama islem yukuyla hesaplaniyor.
+- Tek kaynakli ve eski olaylar daha dusuk guvenle puanlaniyor; yuzde 90 ustu sonuc dogrudan veya cok kaynakli kanit gerektiriyor.
+- Kisa sonuc; bilesen, bulgu rolu, guncellik, tekrar, mavi ekran iliskisi ve ilk yapilacak islemi ayri gosteriyor.
+- Uygulama, servis ve surucu hatalari bilesen bazinda gruplanarak tekrar eden kayitlar tek bulguda toplaniyor.
+- Tarama asamasi arayuzde canli gosteriliyor ve bulgu seviye adlari Turkce sunuluyor.
+- HTML raporda ilk uc bulgu acik, ham kayitlar kapali; hata ve Reliability kayitlari gruplanmis olarak gosteriliyor.
+- HTML bulgularindan ilgili ham kanitlara tek tikla gecilip otomatik arama yapilabiliyor.
+- Sistem Koruma sorgusuna kontrollu zaman asimi uygulaniyor ve bu ikincil sorgu genel taramanin tamamlanma yolundan ayriliyor.
+
 ## 1.2.0 - 2026-07-13
 
 ### Improved

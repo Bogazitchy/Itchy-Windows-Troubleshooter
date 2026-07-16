@@ -12,11 +12,65 @@ public enum Severity
 
 public sealed record Finding(Severity Severity, string Title, string Cause, string Evidence, string Recommendation)
 {
+    public int ConfidenceScore { get; init; } = 50;
+    public string Correlation { get; init; } = "Tek veri kaynagi";
+    public string Component { get; init; } = "Windows";
+    public string Role { get; init; } = "Kok Neden Adayi";
+    public DateTime? LatestOccurrence { get; init; }
+    public int OccurrenceCount { get; init; } = 1;
+    public int IndependentSourceCount { get; init; } = 1;
+    public string CrashRelation { get; init; } = "Dogrudan zaman eslesmesi yok";
+    public string SearchKey { get; init; } = string.Empty;
+
+    public bool IsRootCauseCandidate => Role is "Dogrudan Ariza" or "Kok Neden Adayi";
+
+    public string SeverityText => Severity switch
+    {
+        Severity.Critical => "Kritik",
+        Severity.Warning => "Uyari",
+        Severity.Success => "Basarili",
+        _ => "Bilgi"
+    };
+
+    public string Confidence => ConfidenceScore switch
+    {
+        >= 90 => "Cok Yuksek",
+        >= 75 => "Yuksek",
+        >= 50 => "Orta",
+        >= 30 => "Dusuk",
+        _ => "Cok Dusuk"
+    };
+
+    public string RecencyText
+    {
+        get
+        {
+            if (!LatestOccurrence.HasValue)
+            {
+                return "Zaman bilgisi yok";
+            }
+
+            var age = DateTime.Now - LatestOccurrence.Value;
+            if (age.TotalHours <= 24) return "Son 24 saat";
+            if (age.TotalDays <= 7) return "Son 7 gun";
+            if (age.TotalDays <= 30) return "Son 30 gun";
+            return "Eski kayit";
+        }
+    }
+
     public Brush SeverityBrush => Severity switch
     {
         Severity.Critical => Brushes.IndianRed,
         Severity.Warning => Brushes.Orange,
         Severity.Success => Brushes.MediumSeaGreen,
+        _ => Brushes.DeepSkyBlue
+    };
+
+    public Brush ConfidenceBrush => ConfidenceScore switch
+    {
+        >= 90 => Brushes.IndianRed,
+        >= 75 => Brushes.Orange,
+        >= 50 => Brushes.Gold,
         _ => Brushes.DeepSkyBlue
     };
 }
@@ -84,6 +138,20 @@ public sealed record DriverInfoItem(
 
 public sealed record ResourceMetricItem(string Name, string Value, string Status, string Detail);
 
+public sealed record HealthCheckItem(
+    DateTime? ObservedAt,
+    string Category,
+    string Component,
+    string Status,
+    string Value,
+    string Detail);
+
+public sealed record ScanCoverageItem(string Source, string Status, int RecordCount, string Detail);
+
+public sealed record SystemHealthScanResult(
+    IReadOnlyList<HealthCheckItem> Checks,
+    IReadOnlyList<ScanCoverageItem> Coverage);
+
 public sealed record ResourceScanResult(
     IReadOnlyList<ResourceMetricItem> Metrics,
     double CpuAverage,
@@ -119,6 +187,8 @@ public sealed record GeneralScanResult(
     IReadOnlyList<EventRecordItem> Events,
     IReadOnlyList<ReliabilityRecordItem> ReliabilityRecords,
     IReadOnlyList<DiagnosticLogItem> DiagnosticLogs,
+    IReadOnlyList<HealthCheckItem> HealthChecks,
+    IReadOnlyList<ScanCoverageItem> ScanCoverage,
     IReadOnlyList<SystemInfoItem> SystemDetails,
     IReadOnlyList<DriverInfoItem> Drivers,
     IReadOnlyList<ResourceMetricItem> ResourceMetrics);
@@ -135,6 +205,8 @@ public sealed record ReportSnapshot(
     IReadOnlyList<EventRecordItem> Events,
     IReadOnlyList<ReliabilityRecordItem> ReliabilityRecords,
     IReadOnlyList<DiagnosticLogItem> DiagnosticLogs,
+    IReadOnlyList<HealthCheckItem> HealthChecks,
+    IReadOnlyList<ScanCoverageItem> ScanCoverage,
     IReadOnlyList<SystemInfoItem> SystemDetails,
     IReadOnlyList<DriverInfoItem> Drivers,
     IReadOnlyList<ResourceMetricItem> ResourceMetrics,

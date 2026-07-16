@@ -15,6 +15,20 @@
 
 ![ITCHY sistem bilgileri ekrani](docs/images/system-information.png)
 
+## v1.3.0: Daha Net Teshis
+
+Bu surum yeni arac kalabaligi eklemek yerine mevcut tarama ve sonuc motorunu daha guvenilir hale getirir.
+
+| Iyilestirme | Kullaniciya etkisi |
+|---|---|
+| Kanit rolleri | Kok neden adayi, dogrudan ariza, cokme kaniti, yapilandirma ve sonuc olaylari birbirinden ayrilir |
+| Guven puani | Eski ve tek kaynakli kayitlar daha dusuk puanlanir; yuzde 90 ustu sonuc guclu veya cok kaynakli kanit gerektirir |
+| Sonuc ozeti | Bilesen, guven, tekrar, guncellik, mavi ekran iliskisi ve ilk yapilacak islem tek yerde gorunur |
+| Yanlis pozitif kontrolu | Kernel-Power ve zaman eslesmesi olmayan Code Integrity olaylari otomatik olarak kok neden sayilmaz |
+| Gruplama | Tekrarlayan uygulama, servis, surucu ve Reliability kayitlari bilesen bazinda birlestirilir |
+| Tarama durumu | Olay kayitlari, sistem sagligi, kaynak kullanimi ve dump analizi asamalari canli gosterilir |
+| Teknik rapor | Ilk uc bulgu acik gelir; ham kayitlar kapali tutulur ve bulgudan ilgili kanita tek tikla gecilir |
+
 ## Neden ITCHY?
 
 Windows mavi ekranlari genellikle tek bir kaynaktan anlasilmaz. `ntoskrnl.exe`, Kernel-Power 41 veya bos bir minidump klasoru tek basina kok neden degildir. ITCHY; dump, stack, surucu dosyasi, semboller ve ayni zamandaki Windows olaylarini birlikte degerlendirerek teknisyene kanitli ve guven seviyeli bir sonuc verir.
@@ -24,6 +38,9 @@ Windows mavi ekranlari genellikle tek bir kaynaktan anlasilmaz. `ntoskrnl.exe`, 
 | Mavi ekran | Minidump ve `MEMORY.DMP` dosyalarini WinDbg sembolleriyle analiz eder |
 | Kok neden | Stop code, stack, modul, process, failure bucket ve `.sys` surucusunu ayirir |
 | Korelasyon | WHEA, disk, NVMe, NTFS, GPU, Kernel-PnP ve BugCheck olaylarini zamanla eslestirir |
+| Genel tarama | Event Viewer, Reliability, aygitlar, suruculer ve kaynak kullanimini rol, guncellik ve guven puaniyla birlestirir |
+| Sistem sagligi | Disk/SMART, pagefile, dump ayari, bellek testi, yeniden baslatma ve DISM durumunu kontrol eder |
+| Tarama kapsami | Okunan, kismi kalan ve erisilemeyen kaynaklari ayri gosterir; eksik veriyi temiz sonuc saymaz |
 | Sistem | Windows, anakart, CPU, RAM, GPU, disk, BIOS ve surucu envanterini gosterir |
 | Sensor | Desteklenen cihazlarda CPU/GPU sicakliklarini her dakika yeniler |
 | Rapor | Sekmeli, aranabilir HTML teknisyen raporu ve duz metin raporu uretir |
@@ -51,12 +68,13 @@ HTML rapor artik tek parca uzun bir sayfa degildir. Asagidaki sekmeler arasinda 
 - Oncelikli Bulgular
 - Mavi Ekran ve Dump
 - Hata Kayitlari
+- Saglik Denetimleri ve Tarama Kapsami
 - Guvenilirlik Gecmisi
 - Sistem ve Suruculer
 - Koruma ve Onarim
 - Ham Uygulama Logu
 
-Tablolar sabit baslikli ve kaydirilabilir yapidadir. Yazdirma veya PDF alma sirasinda butun sekmeler eksiksiz rapora eklenir.
+Ilk uc onemli bulgu dogrudan acilir; ayrintili ve ham kayitlar raporu bogmamasi icin kapali bolumlerde tutulur. Hata ve Reliability kayitlari bilesen bazinda gruplanir. Bulgu kartindaki ilgili kayit dugmesi, Hata Kayitlari sekmesine gecip kaniti otomatik arar. Tablolar sabit baslikli ve kaydirilabilir yapidadir; yazdirma veya PDF alma sirasinda butun sekmeler eksiksiz rapora eklenir.
 
 ## Sistem ve Surucu Envanteri
 
@@ -69,7 +87,7 @@ Tablolar sabit baslikli ve kaydirilabilir yapidadir. Yazdirma veya PDF alma sira
 ## Kurulum
 
 1. [Releases](https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter/releases/latest) sayfasini acin.
-2. `ITCHY-Windows-Troubleshooter-v1.2.0-win-x64.exe` dosyasini indirin.
+2. `ITCHY-Windows-Troubleshooter-v1.3.0-win-x64.exe` dosyasini indirin.
 3. Uygulamayi calistirin. Korunan dump dosyalari ve sistem onarimlari icin **Yonetici olarak calistir** secenegini kullanin.
 4. Tam sembol/stack analizi icin Mavi Ekran sekmesindeki **WinDbg Kur / Guncelle** dugmesini kullanin.
 
@@ -108,6 +126,7 @@ Yayin dosyasi `bin\Release\single-file\ITCHY Windows Troubleshooter.exe` yolunda
 Models/                         Veri modelleri
 Services/AdvancedDumpAnalysis  WinDbg, stop code, stack ve korelasyon motoru
 Services/SystemAnalysis        Event Viewer ve genel teshis kurallari
+Services/SystemHealthAnalysis Disk/SMART, dump, bellek ve Windows saglik denetimleri
 Services/SystemInventory       Sistem, BIOS ve surucu envanteri
 Services/HardwareSensor        CPU/GPU sensorleri
 Services/ReportService         Sekmeli HTML/TXT rapor motoru
