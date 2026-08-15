@@ -138,7 +138,10 @@ public sealed class SystemAnalysisService
             coverage,
             systemDetails,
             drivers,
-            resourceResult.Metrics);
+            resourceResult.Metrics)
+        {
+            CrossDumpAnalysis = blueScreenResult.CrossDumpAnalysis
+        };
     }
 
     public async Task<BlueScreenScanResult> AnalyzeBlueScreensAsync(CancellationToken cancellationToken)
@@ -149,8 +152,15 @@ public sealed class SystemAnalysisService
 
     public async Task<BlueScreenScanResult> AnalyzeSelectedDumpAsync(string dumpPath, CancellationToken cancellationToken)
     {
+        return await AnalyzeSelectedDumpsAsync([dumpPath], cancellationToken);
+    }
+
+    public async Task<BlueScreenScanResult> AnalyzeSelectedDumpsAsync(
+        IReadOnlyList<string> dumpPaths,
+        CancellationToken cancellationToken)
+    {
         var events = await GetImportantEventsAsync(30, cancellationToken);
-        return await _dumpAnalysis.AnalyzeAsync([dumpPath], events, cancellationToken);
+        return await _dumpAnalysis.AnalyzeAsync(dumpPaths, events, cancellationToken);
     }
 
     private async Task<BlueScreenScanResult> AnalyzeBlueScreensAsync(

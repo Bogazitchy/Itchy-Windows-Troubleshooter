@@ -77,6 +77,75 @@ public sealed record Finding(Severity Severity, string Title, string Cause, stri
 
 public sealed record BlueScreenRecord(string Title, string Summary, string TechnicalDetail, DateTime? TimeCreated);
 
+public enum RootCauseCategory
+{
+    GraphicsDriver,
+    KernelDriverConflict,
+    MemoryInstability,
+    CpuInstability,
+    Storage,
+    Hardware,
+    Power,
+    NetworkDriver,
+    SecurityOrAntiCheatDriver,
+    Unknown
+}
+
+public sealed record StackDriverEvidence(
+    string DriverName,
+    string DisplayName,
+    string Category,
+    int StackOccurrences,
+    bool DirectFault,
+    bool ProbablyCausedBy,
+    bool IsImageName,
+    bool IsModuleName,
+    bool IsThirdParty,
+    string Metadata)
+{
+    public string OccurrenceText => $"{DriverName} x{StackOccurrences}";
+}
+
+public sealed record RootCauseCandidate(
+    RootCauseCategory Category,
+    string Title,
+    int EvidenceScore,
+    string Strength,
+    string Evidence,
+    string Interpretation,
+    string Recommendation);
+
+public sealed record RecurringPattern(string Title, string Evidence, string Interpretation);
+
+public sealed record CrossDumpAnalysisResult(
+    string Summary,
+    string CommonPattern,
+    string Diagnosis,
+    string EvidenceSummary,
+    string InterpretationSummary,
+    IReadOnlyList<RootCauseCandidate> Candidates,
+    IReadOnlyList<RecurringPattern> Patterns,
+    IReadOnlyList<string> TroubleshootingSteps)
+{
+    public static CrossDumpAnalysisResult Empty { get; } = new(
+        "Henuz toplu dump analizi yapilmadi.",
+        "Karsilastirilabilir dump deseni yok.",
+        "Teshis icin dump verisi gerekli.",
+        "Dogrudan dump kaniti yok.",
+        "Eksik veri temiz sistem anlamina gelmez.",
+        [],
+        [],
+        []);
+
+    public string CandidateSummary => Candidates.Count == 0
+        ? "Siralanabilir kok neden adayi yok."
+        : string.Join(Environment.NewLine, Candidates.Select((x, i) => $"{i + 1}. {x.Title} - {x.Strength}{Environment.NewLine}   {x.Evidence}"));
+
+    public string TroubleshootingSummary => TroubleshootingSteps.Count == 0
+        ? "Kanita dayali islem sirasi olusturulamadi."
+        : string.Join(Environment.NewLine, TroubleshootingSteps.Select((x, i) => $"{i + 1}. {x}"));
+}
+
 public sealed record DumpAnalysisItem(
     string FileName,
     string FilePath,
@@ -99,6 +168,50 @@ public sealed record DumpAnalysisItem(
     string DebuggerUsed,
     string RawDebuggerOutput)
 {
+    public string ExceptionCode { get; init; } = "";
+    public string ExceptionName { get; init; } = "";
+    public string BugCheckString { get; init; } = "";
+    public string AccessType { get; init; } = "";
+    public string AttemptedAddress { get; init; } = "";
+    public string ExceptionRecord { get; init; } = "";
+    public string ContextRecord { get; init; } = "";
+    public string FaultingThread { get; init; } = "";
+    public string ReadAddress { get; init; } = "";
+    public string WriteAddress { get; init; } = "";
+    public string FaultingAddress { get; init; } = "";
+    public string FaultingModule { get; init; } = "";
+    public string FaultingSymbol { get; init; } = "";
+    public string FaultingInstruction { get; init; } = "";
+    public string FaultingIp { get; init; } = "";
+    public string ProbablyCausedBy { get; init; } = "";
+    public string ImageName { get; init; } = "";
+    public string ModuleName { get; init; } = "";
+    public string SymbolName { get; init; } = "";
+    public string StackText { get; init; } = "";
+    public string StackCommand { get; init; } = "";
+    public string FailureIdHash { get; init; } = "";
+    public string CustomerCrashCount { get; init; } = "";
+    public string DefaultBucketId { get; init; } = "";
+    public string RegisterContextStatus { get; init; } = "Register context minidump icinde mevcut degil.";
+    public string RegisterSummary { get; init; } = "";
+    public string PointerAnalysis { get; init; } = "";
+    public string TechnicalInterpretation { get; init; } = "";
+    public IReadOnlyList<StackDriverEvidence> ImportantThirdPartyDrivers { get; init; } = [];
+    public IReadOnlyDictionary<string, int> StackDriverOccurrences { get; init; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyList<string> MemoryCorruptionIndicators { get; init; } = [];
+    public IReadOnlyList<string> InvalidPointerIndicators { get; init; } = [];
+    public IReadOnlyList<RootCauseCandidate> RootCauseCandidates { get; init; } = [];
+
+    public string ImportantThirdPartyDriversText => ImportantThirdPartyDrivers.Count == 0
+        ? "Belirgin ucuncu parti stack surucusu yok."
+        : string.Join(", ", ImportantThirdPartyDrivers.Select(x => x.OccurrenceText));
+
+    public string ExceptionSummary => string.IsNullOrWhiteSpace(ExceptionCode)
+        ? "Mevcut degil"
+        : $"{ExceptionCode} {ExceptionName}".Trim() +
+          (string.IsNullOrWhiteSpace(AccessType) ? "" : $" | {AccessType}") +
+          (string.IsNullOrWhiteSpace(AttemptedAddress) ? "" : $" | {AttemptedAddress}");
+
     public Brush ConfidenceBrush => Confidence switch
     {
         "Yuksek" => Brushes.IndianRed,
@@ -111,7 +224,10 @@ public sealed record DumpAnalysisItem(
 public sealed record BlueScreenScanResult(
     string Summary,
     IReadOnlyList<DumpAnalysisItem> DumpAnalyses,
-    IReadOnlyList<BlueScreenRecord> Signals);
+    IReadOnlyList<BlueScreenRecord> Signals)
+{
+    public CrossDumpAnalysisResult CrossDumpAnalysis { get; init; } = CrossDumpAnalysisResult.Empty;
+}
 
 public sealed record EventRecordItem(DateTime? TimeCreated, string LogName, string Provider, int Id, string Level, string Message);
 
@@ -191,7 +307,10 @@ public sealed record GeneralScanResult(
     IReadOnlyList<ScanCoverageItem> ScanCoverage,
     IReadOnlyList<SystemInfoItem> SystemDetails,
     IReadOnlyList<DriverInfoItem> Drivers,
-    IReadOnlyList<ResourceMetricItem> ResourceMetrics);
+    IReadOnlyList<ResourceMetricItem> ResourceMetrics)
+{
+    public CrossDumpAnalysisResult CrossDumpAnalysis { get; init; } = CrossDumpAnalysisResult.Empty;
+}
 
 public sealed record ReportSnapshot(
     string SystemStatus,
@@ -213,6 +332,9 @@ public sealed record ReportSnapshot(
     IReadOnlyList<RestorePointItem> RestorePoints,
     IReadOnlyList<RepairResult> RepairHistory,
     string ProtectionStatus,
-    string LogText);
+    string LogText)
+{
+    public CrossDumpAnalysisResult CrossDumpAnalysis { get; init; } = CrossDumpAnalysisResult.Empty;
+}
 
 public sealed record ReportResult(string HtmlPath, string TextPath);
