@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Buffers.Binary;
 using System.Globalization;
 using System.IO;
@@ -16,17 +15,11 @@ public sealed class AdvancedDumpAnalysisService
         "memory_corruption", "hardware", "unknown_image", "win32kfull.sys", "win32kbase.sys"
     };
 
-    private static readonly HashSet<string> StackFrameworkModules = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "nt", "ntkrnlmp", "ntoskrnl", "hal", "kd", "Wdf01000", "fltmgr", "storport",
-        "stornvme", "storahci", "ndis", "tcpip", "CLASSPNP", "disk", "partmgr", "volmgr",
-        "NTFS", "Fs_Rec", "CI", "dxgkrnl", "watchdog", "win32kfull", "win32kbase"
-    };
-
     private static readonly IReadOnlyDictionary<string, BugCheckDescription> BugChecks =
         new Dictionary<string, BugCheckDescription>(StringComparer.OrdinalIgnoreCase)
         {
             ["0xA"] = new("IRQL_NOT_LESS_OR_EQUAL", "Surucu gecersiz bellek adresine yuksek IRQL seviyesinde eristi; RAM bozulmasi da ihtimaldir.", "Suruculeri, RAM'i ve varsa overclock/XMP ayarlarini kontrol edin."),
+            ["0x1E"] = new("KMODE_EXCEPTION_NOT_HANDLED", "Kernel modunda yakalanmayan bir istisna olustu. Exception code, faulting instruction ve context asil kanitlardir.", "Faulting surucuyu temiz kurun; tekrarlayan erisim ihlalinde RAM/XMP/CPU bellek kararliligini da test edin."),
             ["0x1A"] = new("MEMORY_MANAGEMENT", "Bellek yonetimi tutarsizlik tespit etti. RAM, depolama paging veya bellek bozan surucu olabilir.", "Windows Memory Diagnostic yerine uzun MemTest86 testi, XMP/EXPO kapatma ve surucu kontrolu yapin."),
             ["0x3B"] = new("SYSTEM_SERVICE_EXCEPTION", "Kernel modunda sistem servisi istisnasi olustu; ucuncu taraf surucu veya bellek bozulmasi yaygin nedendir.", "Stack'teki ucuncu taraf surucuyu guncelleyin/kaldirin ve RAM testi yapin."),
             ["0x50"] = new("PAGE_FAULT_IN_NONPAGED_AREA", "Gecerli olmasi gereken kernel bellegine erisim basarisiz oldu. Surucu, RAM veya disk kaynakli olabilir.", "RAM, disk ve stack'te gorunen surucuyu birlikte kontrol edin."),
@@ -56,6 +49,9 @@ public sealed class AdvancedDumpAnalysisService
 
     private readonly CommandRunner _runner;
     private readonly Func<string, Task> _log;
+    private readonly WinDbgOutputParser _parser = new();
+    private readonly DriverClassificationService _driverClassifier = new();
+    private readonly DumpCorrelationService _correlationService = new();
 
     public AdvancedDumpAnalysisService(CommandRunner runner, Func<string, Task> log)
     {
@@ -88,10 +84,15 @@ public sealed class AdvancedDumpAnalysisService
             analyses.Add(await AnalyzeSingleAsync(path, debugger, contextEvents, cancellationToken));
         }
 
-        analyses = ApplyRecurringEvidence(analyses).ToList();
         var signals = BuildEventSignals(contextEvents);
-        var summary = BuildOverallSummary(analyses, contextEvents, debugger);
-        return new BlueScreenScanResult(summary, analyses, signals);
+        var crossDumpAnalysis = _correlationService.Analyze(analyses, contextEvents);
+        var summary = analyses.Count == 0
+            ? BuildNoDumpSummary(contextEvents)
+            : crossDumpAnalysis.Summary + Environment.NewLine + crossDumpAnalysis.Diagnosis;
+        return new BlueScreenScanResult(summary, analyses, signals)
+        {
+            CrossDumpAnalysis = crossDumpAnalysis
+        };
     }
 
     private async Task<DumpAnalysisItem> AnalyzeSingleAsync(
@@ -134,7 +135,7 @@ public sealed class AdvancedDumpAnalysisService
             Directory.CreateDirectory(symbolCache);
 
             var symbolPath = $"srv*{symbolCache}*https://msdl.microsoft.com/download/symbols";
-            var commands = "!analyze -v; .bugcheck; kv; lm t n; !blackboxbsd; !blackboxntfs; !blackboxpnp; !blackboxwinlogon; q";
+            var commands = "!analyze -v; .bugcheck; .echo ITCHY_BASE_REGISTERS; r; .echo ITCHY_DISASSEMBLY; u @rip-20 L40; kv; lm t n; !blackboxbsd; !blackboxntfs; !blackboxpnp; !blackboxwinlogon; q";
             var arguments = $"-z {Quote(dumpPath)} -y {Quote(symbolPath)} -logo {Quote(rawPath)} -c {Quote(commands)}";
             var commandResult = await _runner.RunExecutableAsync(
                 debugger.Path,
@@ -159,34 +160,91 @@ public sealed class AdvancedDumpAnalysisService
                 }
             }
 
+            var preliminary = _parser.Parse(rawOutput, nearestBugCheck?.Message ?? "");
+            var contextAddress = BugCheckKnowledgeBase.TryGetContextRecord(
+                preliminary.BugCheckCode,
+                preliminary.BugCheckArguments,
+                preliminary.ContextRecord);
+            if (!string.IsNullOrWhiteSpace(contextAddress) && commandResult.ExitCode != -1)
+            {
+                await _log($"{info.Name}: {preliminary.BugCheckCode} semantigine uygun context record {contextAddress} inceleniyor.");
+                var contextCommands = $".echo ITCHY_CONTEXT_BEGIN; .cxr {contextAddress}; .echo ITCHY_CONTEXT_REGISTERS; r; .echo ITCHY_CONTEXT_STACK; kv; .echo ITCHY_CONTEXT_DISASSEMBLY; u @rip-20 L40; q";
+                var contextArguments = $"-z {Quote(dumpPath)} -y {Quote(symbolPath)} -c {Quote(contextCommands)}";
+                var contextResult = await _runner.RunExecutableAsync(
+                    debugger.Path,
+                    contextArguments,
+                    $"{info.Name} context analizi",
+                    cancellationToken,
+                    TimeSpan.FromMinutes(2));
+                if (!string.IsNullOrWhiteSpace(contextResult.Output))
+                {
+                    rawOutput += Environment.NewLine + Environment.NewLine + "===== ITCHY CONTEXT ANALYSIS =====" + Environment.NewLine + contextResult.Output;
+                }
+            }
+
             analysisStatus = commandResult.Success || HasAnalysisFields(rawOutput)
                 ? HasSymbolProblems(rawOutput) ? "Tamamlandi - bazi semboller eksik" : "Tamamlandi"
                 : commandResult.ExitCode == -1 ? "Zaman asimi" : "Debugger dump'i tam cozumleyemedi";
         }
 
-        var parsed = ParseDebuggerOutput(rawOutput, nearestBugCheck?.Message ?? "");
+        var parsed = _parser.Parse(rawOutput, nearestBugCheck?.Message ?? "");
         if (string.IsNullOrWhiteSpace(parsed.BugCheckCode) && !string.IsNullOrWhiteSpace(integrity.BugCheckCode))
         {
             parsed = parsed with
             {
                 BugCheckCode = integrity.BugCheckCode,
-                Parameters = integrity.BugCheckParameters
+                Parameters = integrity.BugCheckParameters,
+                BugCheckArguments = ParseHeaderArguments(integrity.BugCheckParameters)
+            };
+        }
+        if (string.IsNullOrWhiteSpace(parsed.ExceptionCode))
+        {
+            var inferredException = BugCheckKnowledgeBase.InferExceptionCode(parsed.BugCheckCode, parsed.BugCheckArguments);
+            if (!string.IsNullOrWhiteSpace(inferredException))
+            {
+                parsed = parsed with
+                {
+                    ExceptionCode = inferredException,
+                    ExceptionName = inferredException.Equals("0xC0000005", StringComparison.OrdinalIgnoreCase) ? "Access Violation" : "",
+                    MemoryCorruptionIndicators = inferredException.Equals("0xC0000005", StringComparison.OrdinalIgnoreCase)
+                        ? [.. parsed.MemoryCorruptionIndicators, "0xC0000005 Access Violation"]
+                        : parsed.MemoryCorruptionIndicators
+                };
+            }
+        }
+        if (string.IsNullOrWhiteSpace(parsed.AccessType) || string.IsNullOrWhiteSpace(parsed.AttemptedAddress))
+        {
+            parsed = parsed with
+            {
+                AccessType = string.IsNullOrWhiteSpace(parsed.AccessType)
+                    ? BugCheckKnowledgeBase.InferAccessType(parsed.BugCheckCode, parsed.BugCheckArguments)
+                    : parsed.AccessType,
+                AttemptedAddress = string.IsNullOrWhiteSpace(parsed.AttemptedAddress)
+                    ? BugCheckKnowledgeBase.InferAttemptedAddress(parsed.BugCheckCode, parsed.BugCheckArguments)
+                    : parsed.AttemptedAddress
             };
         }
         var bugCheck = DescribeBugCheck(parsed.BugCheckCode);
         var component = ResolveSuspectedComponent(parsed, bugCheck);
-        var componentDetails = GetComponentDetails(component);
+        var componentDetails = _driverClassifier.GetMetadata(component);
+        var thirdPartyDrivers = _driverClassifier.BuildEvidence(parsed);
         var isExplicitThirdParty = IsExplicitThirdParty(component, componentDetails);
         var confidence = DetermineConfidence(parsed, bugCheck, component, isExplicitThirdParty, correlated);
+        if (thirdPartyDrivers.Any(x => x.DirectFault)) confidence = "Yuksek";
+        if (HasSymbolProblems(rawOutput)) confidence = DowngradeConfidence(confidence);
         var rootCause = BuildRootCause(parsed, bugCheck, component, confidence, integrity);
         var evidence = BuildEvidence(parsed, integrity, correlated);
         var recommendation = BuildRecommendation(bugCheck, component, componentDetails);
+        var registerSummary = parsed.Registers.Count == 0
+            ? ""
+            : string.Join("  ", parsed.Registers.Select(x => $"{x.Key}={x.Value}"));
+        var technicalInterpretation = BuildTechnicalInterpretation(parsed, thirdPartyDrivers);
 
         var rawForReport = string.IsNullOrWhiteSpace(rawOutput)
             ? "Debugger ciktisi yok. WinDbg/KD kurulumu ve yonetici izni gerekebilir."
             : rawOutput.Length > 160_000 ? rawOutput[..160_000] + Environment.NewLine + "[Cikti 160000 karakterde kesildi.]" : rawOutput;
 
-        return new DumpAnalysisItem(
+        var item = new DumpAnalysisItem(
             info.Name,
             info.FullName,
             info.LastWriteTime,
@@ -206,72 +264,50 @@ public sealed class AdvancedDumpAnalysisService
             correlated.Text,
             recommendation,
             debuggerUsed,
-            rawForReport);
+            rawForReport)
+        {
+            ExceptionCode = parsed.ExceptionCode,
+            ExceptionName = parsed.ExceptionName,
+            BugCheckString = parsed.BugCheckString,
+            AccessType = parsed.AccessType,
+            AttemptedAddress = parsed.AttemptedAddress,
+            ExceptionRecord = parsed.ExceptionRecord,
+            ContextRecord = parsed.ContextRecord,
+            FaultingThread = parsed.FaultingThread,
+            ReadAddress = parsed.ReadAddress,
+            WriteAddress = parsed.WriteAddress,
+            FaultingAddress = parsed.FaultingAddress,
+            FaultingModule = parsed.FaultingModule,
+            FaultingSymbol = parsed.FaultingSymbol,
+            FaultingInstruction = parsed.FaultingInstruction,
+            FaultingIp = parsed.FaultingIp,
+            ProbablyCausedBy = parsed.ProbablyCausedBy,
+            ImageName = parsed.ImageName,
+            ModuleName = parsed.ModuleName,
+            SymbolName = parsed.SymbolName,
+            StackText = parsed.StackText,
+            StackCommand = parsed.StackCommand,
+            FailureIdHash = parsed.FailureIdHash,
+            CustomerCrashCount = parsed.CustomerCrashCount,
+            DefaultBucketId = parsed.DefaultBucketId,
+            RegisterContextStatus = parsed.Registers.Count == 0
+                ? "Register context minidump icinde mevcut degil."
+                : "Debugger register context'i elde edildi.",
+            RegisterSummary = registerSummary,
+            PointerAnalysis = string.IsNullOrWhiteSpace(parsed.PointerAnalysis)
+                ? "Faulting instruction/register iliskisi dump context'inden kanitlanamadi."
+                : parsed.PointerAnalysis,
+            TechnicalInterpretation = technicalInterpretation,
+            ImportantThirdPartyDrivers = thirdPartyDrivers,
+            StackDriverOccurrences = parsed.StackModuleOccurrences,
+            MemoryCorruptionIndicators = parsed.MemoryCorruptionIndicators,
+            InvalidPointerIndicators = parsed.InvalidPointerIndicators
+        };
+        return item with { RootCauseCandidates = _correlationService.AnalyzeSingle(item) };
     }
 
-    internal static ParsedDebuggerOutput ParseDebuggerOutput(string output, string eventMessage)
-    {
-        var bugCode = FirstValue(output, "BUGCHECK_CODE");
-        var heading = Regex.Match(output, @"(?im)^\s*([A-Z][A-Z0-9_]+)\s+\(([0-9a-fA-F]+)\)\s*$");
-        var bugName = heading.Success ? heading.Groups[1].Value.Trim() : "";
-        if (string.IsNullOrWhiteSpace(bugCode) && heading.Success)
-        {
-            bugCode = heading.Groups[2].Value;
-        }
-
-        if (string.IsNullOrWhiteSpace(bugCode))
-        {
-            var commandBugCheck = Regex.Match(output, @"(?im)Bugcheck code\s+([0-9a-fA-F`]+)");
-            if (commandBugCheck.Success)
-            {
-                bugCode = commandBugCheck.Groups[1].Value.Replace("`", "");
-            }
-        }
-
-        var eventHexValues = Regex.Matches(eventMessage, @"(?i)0x[0-9a-f]{1,16}")
-            .Select(x => x.Value)
-            .ToList();
-        if (string.IsNullOrWhiteSpace(bugCode) && eventHexValues.Count > 0)
-        {
-            bugCode = eventHexValues[0];
-        }
-
-        bugCode = NormalizeBugCheckCode(bugCode);
-        var args = new List<string>();
-        for (var i = 1; i <= 4; i++)
-        {
-            var arg = Regex.Match(output, $@"(?im)^\s*Arg{i}:\s*(.+)$");
-            if (arg.Success)
-            {
-                args.Add($"Arg{i}: {arg.Groups[1].Value.Trim()}");
-            }
-        }
-
-        if (args.Count == 0 && eventHexValues.Count > 1)
-        {
-            args.AddRange(eventHexValues.Skip(1).Take(4).Select((x, i) => $"Arg{i + 1}: {x}"));
-        }
-
-        var probable = Regex.Match(output, @"(?im)^\s*Probably caused by\s*:\s*(.+)$").Groups[1].Value.Trim();
-        var image = FirstValue(output, "IMAGE_NAME");
-        var module = FirstValue(output, "MODULE_NAME");
-        var process = FirstValue(output, "PROCESS_NAME");
-        var bucket = FirstValue(output, "FAILURE_BUCKET_ID");
-        var symbol = FirstValue(output, "SYMBOL_NAME");
-        var stackCandidates = ExtractStackCandidates(output);
-
-        return new ParsedDebuggerOutput(
-            bugCode,
-            bugName,
-            string.Join(Environment.NewLine, args),
-            probable,
-            image,
-            module,
-            process,
-            bucket,
-            symbol,
-            stackCandidates);
-    }
+    internal static ParsedDebuggerOutput ParseDebuggerOutput(string output, string eventMessage) =>
+        new WinDbgOutputParser().Parse(output, eventMessage);
 
     private async Task<DebuggerTool?> FindDebuggerAsync(CancellationToken cancellationToken)
     {
@@ -322,75 +358,17 @@ public sealed class AdvancedDumpAnalysisService
         return string.IsNullOrWhiteSpace(appxCandidate) ? null : CreateTool(appxCandidate);
     }
 
-    private static IReadOnlyList<DumpAnalysisItem> ApplyRecurringEvidence(IReadOnlyList<DumpAnalysisItem> analyses)
+    private static string BuildNoDumpSummary(IReadOnlyList<EventRecordItem> events)
     {
-        var recurring = analyses
-            .Where(x => IsMeaningfulComponent(x.SuspectedComponent))
-            .GroupBy(x => x.SuspectedComponent, StringComparer.OrdinalIgnoreCase)
-            .Where(x => x.Count() >= 2)
-            .ToDictionary(x => x.Key, x => x.Count(), StringComparer.OrdinalIgnoreCase);
-
-        return analyses.Select(item =>
-        {
-            if (!recurring.TryGetValue(item.SuspectedComponent, out var count))
-            {
-                return item;
-            }
-
-            return item with
-            {
-                Confidence = "Yuksek",
-                RootCauseSummary = $"{count} ayri dump dosyasinda ayni kaynak tekrar ediyor: {item.SuspectedComponent}. {item.RootCauseSummary}",
-                Evidence = item.Evidence + Environment.NewLine + $"Tekrar kaniti: {count} dump ayni bileseni isaret ediyor."
-            };
-        }).ToList();
-    }
-
-    private static string BuildOverallSummary(
-        IReadOnlyList<DumpAnalysisItem> analyses,
-        IReadOnlyList<EventRecordItem> events,
-        DebuggerTool? debugger)
-    {
-        if (analyses.Count == 0)
-        {
-            var bugCheckEvents = events.Where(IsBugCheckEvent).OrderByDescending(x => x.TimeCreated).ToList();
-            var eventAnalysis = bugCheckEvents.Count > 0 ? ParseDebuggerOutput("", bugCheckEvents[0].Message) : null;
-            var eventDescription = eventAnalysis is null ? new BugCheckDescription("", "", "") : DescribeBugCheck(eventAnalysis.BugCheckCode);
-            var stopCode = eventAnalysis is null || string.IsNullOrWhiteSpace(eventAnalysis.BugCheckCode)
-                ? "Stop code olay mesajinda ayristirilamadi."
-                : $"Son stop code: {eventAnalysis.BugCheckCode} {eventDescription.Name}.";
-            return bugCheckEvents.Count > 0
-                ? $"{bugCheckEvents.Count} BugCheck olayi bulundu ancak okunabilir dump dosyasi yok. {stopCode} Asil surucu/stack tespiti icin dump olusturma ayarlarini ve disk bos alanini kontrol edin."
-                : "Okunabilir dump veya BugCheck kaydi bulunmadi. Bu durum mavi ekran yasanmadigi anlamina gelmez; dump yazimi kapali, dosya temizlenmis veya klasor erisimi engellenmis olabilir.";
-        }
-
-        var recurring = analyses
-            .Where(x => IsMeaningfulComponent(x.SuspectedComponent))
-            .GroupBy(x => x.SuspectedComponent, StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(x => x.Count())
-            .FirstOrDefault();
-        var latest = analyses.OrderByDescending(x => x.CreatedAt).First();
-        var builder = new StringBuilder();
-        if (recurring is not null && recurring.Count() >= 2)
-        {
-            builder.Append($"En guclu ortak kaynak: {recurring.Key}; {recurring.Count()} dump dosyasinda tekrar ediyor. ");
-        }
-        else
-        {
-            builder.Append($"En son dump sonucu: {latest.BugCheckCode} {latest.BugCheckName}; supheli kaynak {latest.SuspectedComponent}. ");
-        }
-
-        builder.Append($"Guven seviyesi: {latest.Confidence}. ");
-        if (debugger is null)
-        {
-            builder.Append("WinDbg/KD bulunamadigi icin analiz Event Viewer ve dump butunlugu ile sinirli. Mavi Ekran sekmesindeki WinDbg Kur dugmesiyle tam sembol/stack analizini etkinlestirin.");
-        }
-        else
-        {
-            builder.Append("WinDbg sembolleri, !analyze, stack, modul ve olay zamani korelasyonu birlikte degerlendirildi. ntoskrnl.exe tek basina asil neden kabul edilmez.");
-        }
-
-        return builder.ToString();
+        var bugCheckEvents = events.Where(IsBugCheckEvent).OrderByDescending(x => x.TimeCreated).ToList();
+        var eventAnalysis = bugCheckEvents.Count > 0 ? ParseDebuggerOutput("", bugCheckEvents[0].Message) : null;
+        var eventDescription = eventAnalysis is null ? new BugCheckDescription("", "", "") : DescribeBugCheck(eventAnalysis.BugCheckCode);
+        var stopCode = eventAnalysis is null || string.IsNullOrWhiteSpace(eventAnalysis.BugCheckCode)
+            ? "Stop code olay mesajinda ayristirilamadi."
+            : $"Son stop code: {eventAnalysis.BugCheckCode} {eventDescription.Name}.";
+        return bugCheckEvents.Count > 0
+            ? $"{bugCheckEvents.Count} BugCheck olayi bulundu ancak okunabilir dump dosyasi yok. {stopCode} Asil surucu/stack tespiti icin dump olusturma ayarlarini ve disk bos alanini kontrol edin."
+            : "Okunabilir dump veya BugCheck kaydi bulunmadi. Bu durum mavi ekran yasanmadigi anlamina gelmez; dump yazimi kapali, dosya temizlenmis veya klasor erisimi engellenmis olabilir.";
     }
 
     private static IReadOnlyList<BlueScreenRecord> BuildEventSignals(IReadOnlyList<EventRecordItem> events)
@@ -426,8 +404,12 @@ public sealed class AdvancedDumpAnalysisService
             relevant.Any(x => IsDisplayProvider(x.Provider)));
     }
 
-    private static string ResolveSuspectedComponent(ParsedDebuggerOutput parsed, BugCheckDescription bugCheck)
+    private string ResolveSuspectedComponent(ParsedDebuggerOutput parsed, BugCheckDescription bugCheck)
     {
+        var driverEvidence = _driverClassifier.BuildEvidence(parsed);
+        var directDriver = driverEvidence.FirstOrDefault(x => x.DirectFault);
+        if (directDriver is not null) return directDriver.DriverName;
+
         var probableToken = Regex.Match(parsed.ProbablyCausedBy, @"(?i)\b[\w.-]+\.(?:sys|dll|exe)\b");
         var explicitComponent = probableToken.Success ? probableToken.Value : parsed.ImageName;
         if (string.IsNullOrWhiteSpace(explicitComponent) && !string.IsNullOrWhiteSpace(parsed.ModuleName))
@@ -437,15 +419,17 @@ public sealed class AdvancedDumpAnalysisService
                 : parsed.ModuleName + ".sys";
         }
 
-        if (!string.IsNullOrWhiteSpace(explicitComponent) && !GenericComponents.Contains(explicitComponent))
+        if (!string.IsNullOrWhiteSpace(explicitComponent) &&
+            !GenericComponents.Contains(explicitComponent) &&
+            !_driverClassifier.IsFramework(explicitComponent))
         {
             return explicitComponent;
         }
 
-        var stackModule = parsed.StackCandidates.FirstOrDefault(x => !StackFrameworkModules.Contains(x));
-        if (!string.IsNullOrWhiteSpace(stackModule))
+        var stackDriver = driverEvidence.FirstOrDefault();
+        if (stackDriver is not null)
         {
-            return stackModule.Contains('.') ? stackModule : stackModule + ".sys";
+            return stackDriver.DriverName;
         }
 
         return parsed.BugCheckCode.ToUpperInvariant() switch
@@ -488,9 +472,24 @@ public sealed class AdvancedDumpAnalysisService
             return $"Dump dosyasi bozuk veya eksik gorunuyor: {integrity.Status}. Asil kaynak stack uzerinden belirlenemedi.";
         }
 
+        if (SameModule(component, parsed.FaultingModule) && !GenericComponents.Contains(component))
+        {
+            return $"Bu dump'in faulting instruction/module kaniti dogrudan {component} icindedir. Bu nedenle surucu bu dump icin guclu birincil suphelidir. {bugCheck.Explanation} Guven: {confidence}.";
+        }
+
+        if (!string.IsNullOrWhiteSpace(parsed.ProbablyCausedBy) && SameModule(component, parsed.ProbablyCausedBy))
+        {
+            return $"WinDbg {component} surucusunu 'Probably caused by' alaninda isaretliyor. Bu guclu bir kanittir ancak daha once olusan bellek bozulmasini tek basina dislamaz. {bugCheck.Explanation} Guven: {confidence}.";
+        }
+
+        if (IsKernelComponent(component) || IsKernelComponent(parsed.FaultingModule))
+        {
+            return $"Cokme Windows kernel kodunda gorunuyor; kernel bozulmus pointer/veriyi kullanan taraf olabilir. Asil neden ucuncu parti kernel surucusu veya bellek kararliligi olabilir. {bugCheck.Explanation} Guven: {confidence}.";
+        }
+
         if (!GenericComponents.Contains(component) && component.EndsWith(".sys", StringComparison.OrdinalIgnoreCase))
         {
-            return $"Birincil supheli {component}. {bugCheck.Explanation} Guven: {confidence}.";
+            return $"{component} dump stack/IMAGE/MODULE kanitinda goruluyor ve supheli olarak degerlendiriliyor; dogrudan fault yoksa kesin neden sayilmaz. {bugCheck.Explanation} Guven: {confidence}.";
         }
 
         if (!string.IsNullOrWhiteSpace(bugCheck.Explanation))
@@ -504,13 +503,20 @@ public sealed class AdvancedDumpAnalysisService
     private static string BuildEvidence(ParsedDebuggerOutput parsed, DumpIntegrity integrity, CorrelationResult correlated)
     {
         var lines = new List<string> { $"Dosya: {integrity.Status}" };
+        if (!string.IsNullOrWhiteSpace(parsed.ExceptionCode)) lines.Add($"EXCEPTION_CODE: {parsed.ExceptionCode} {parsed.ExceptionName}".Trim());
+        if (!string.IsNullOrWhiteSpace(parsed.AccessType) || !string.IsNullOrWhiteSpace(parsed.AttemptedAddress)) lines.Add($"Bellek erisimi: {parsed.AccessType} {parsed.AttemptedAddress}".Trim());
+        if (!string.IsNullOrWhiteSpace(parsed.FaultingAddress)) lines.Add($"Faulting address: {parsed.FaultingAddress}");
+        if (!string.IsNullOrWhiteSpace(parsed.FaultingModule)) lines.Add($"Faulting module: {parsed.FaultingModule}");
+        if (!string.IsNullOrWhiteSpace(parsed.FaultingSymbol)) lines.Add($"Faulting symbol: {parsed.FaultingSymbol}");
+        if (!string.IsNullOrWhiteSpace(parsed.FaultingInstruction)) lines.Add($"Faulting instruction: {parsed.FaultingInstruction}");
         if (!string.IsNullOrWhiteSpace(parsed.ProbablyCausedBy)) lines.Add($"WinDbg: Probably caused by: {parsed.ProbablyCausedBy}");
         if (!string.IsNullOrWhiteSpace(parsed.ImageName)) lines.Add($"IMAGE_NAME: {parsed.ImageName}");
         if (!string.IsNullOrWhiteSpace(parsed.ModuleName)) lines.Add($"MODULE_NAME: {parsed.ModuleName}");
         if (!string.IsNullOrWhiteSpace(parsed.SymbolName)) lines.Add($"SYMBOL_NAME: {parsed.SymbolName}");
         if (!string.IsNullOrWhiteSpace(parsed.FailureBucket)) lines.Add($"FAILURE_BUCKET_ID: {parsed.FailureBucket}");
         if (!string.IsNullOrWhiteSpace(parsed.ProcessName)) lines.Add($"PROCESS_NAME: {parsed.ProcessName}");
-        if (parsed.StackCandidates.Count > 0) lines.Add("Stack modul adaylari: " + string.Join(", ", parsed.StackCandidates));
+        if (parsed.StackModuleOccurrences.Count > 0) lines.Add("Stack modul tekrarlari: " + string.Join(", ", parsed.StackModuleOccurrences.OrderByDescending(x => x.Value).Select(x => $"{x.Key} x{x.Value}")));
+        if (parsed.InvalidPointerIndicators.Count > 0) lines.Add("Gecersiz pointer kaniti: " + string.Join(" | ", parsed.InvalidPointerIndicators));
         if (!string.IsNullOrWhiteSpace(parsed.Parameters)) lines.Add(parsed.Parameters);
         lines.Add("Zaman korelasyonu: " + correlated.Text);
         return string.Join(Environment.NewLine, lines);
@@ -629,30 +635,12 @@ public sealed class AdvancedDumpAnalysisService
 
     private static BugCheckDescription DescribeBugCheck(string code)
     {
-        return BugChecks.TryGetValue(code, out var description)
-            ? description
-            : new BugCheckDescription("", "", "");
-    }
-
-    private static string GetComponentDetails(string component)
-    {
-        if (string.IsNullOrWhiteSpace(component) || !component.Contains('.')) return "";
-        try
+        var knowledge = BugCheckKnowledgeBase.Get(code);
+        if (!string.IsNullOrWhiteSpace(knowledge.Name))
         {
-            var candidates = new[]
-            {
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "System32", "drivers", component),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), component)
-            };
-            var path = candidates.FirstOrDefault(File.Exists);
-            if (path is null) return "Dosya Windows surucu klasorunde bulunamadi; kaldirilmis veya dump baska sisteme ait olabilir.";
-            var version = FileVersionInfo.GetVersionInfo(path);
-            return $"{version.FileDescription}; Uretici: {version.CompanyName}; Surum: {version.FileVersion}; Tarih: {File.GetLastWriteTime(path):dd.MM.yyyy}";
+            return new BugCheckDescription(knowledge.Name, knowledge.Explanation, knowledge.Recommendation);
         }
-        catch
-        {
-            return "";
-        }
+        return BugChecks.TryGetValue(code, out var description) ? description : new BugCheckDescription("", "", "");
     }
 
     private static bool IsExplicitThirdParty(string component, string details)
@@ -660,47 +648,75 @@ public sealed class AdvancedDumpAnalysisService
         return component.EndsWith(".sys", StringComparison.OrdinalIgnoreCase) &&
                !GenericComponents.Contains(component) &&
                !string.IsNullOrWhiteSpace(details) &&
-               !details.StartsWith("Dosya Windows", StringComparison.OrdinalIgnoreCase) &&
+               !details.StartsWith("Dosya bu bilgisayarin", StringComparison.OrdinalIgnoreCase) &&
                !details.Contains("Microsoft Corporation", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static IReadOnlyList<string> ExtractStackCandidates(string output)
-    {
-        if (string.IsNullOrWhiteSpace(output)) return [];
-
-        return Regex.Matches(
-                output,
-                @"(?im)^\s*[0-9a-f`]{8,}\s+[0-9a-f`]{8,}.*?\b([a-z0-9_.-]+)![^\s]+")
-            .Select(x => x.Groups[1].Value.Trim())
-            .Where(x => !string.IsNullOrWhiteSpace(x))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Take(12)
-            .ToList();
-    }
-
-    private static bool IsMeaningfulComponent(string component)
-    {
-        return !string.IsNullOrWhiteSpace(component) &&
-               !component.Equals("Belirlenemedi", StringComparison.OrdinalIgnoreCase) &&
-               !GenericComponents.Contains(component);
-    }
-
-    private static string FirstValue(string output, string key)
-    {
-        var match = Regex.Match(output, $@"(?im)^\s*{Regex.Escape(key)}\s*:\s*(.+)$");
-        return match.Success ? match.Groups[1].Value.Trim() : "";
     }
 
     private static string NormalizeBugCheckCode(string value)
     {
-        if (string.IsNullOrWhiteSpace(value)) return "";
-        var cleaned = value.Trim().Replace("`", "");
-        if (cleaned.StartsWith("0x", StringComparison.OrdinalIgnoreCase)) cleaned = cleaned[2..];
-        cleaned = cleaned.TrimStart('0');
-        if (cleaned.Length == 0) cleaned = "0";
-        return ulong.TryParse(cleaned, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out var code)
-            ? $"0x{code:X}"
-            : value.Trim();
+        return BugCheckKnowledgeBase.NormalizeCode(value);
+    }
+
+    private static IReadOnlyList<string> ParseHeaderArguments(string parameters)
+    {
+        return Regex.Matches(parameters ?? "", @"(?im)^\s*Arg\d:\s*(0x[0-9a-f]+)")
+            .Select(x => x.Groups[1].Value)
+            .ToList();
+    }
+
+    private static string BuildTechnicalInterpretation(
+        ParsedDebuggerOutput parsed,
+        IReadOnlyList<StackDriverEvidence> thirdPartyDrivers)
+    {
+        var lines = new List<string>();
+        if (parsed.ExceptionCode.Equals("0xC0000005", StringComparison.OrdinalIgnoreCase))
+        {
+            lines.Add("Kernel modunda gecersiz bir bellek adresine erisilmeye calisildi.");
+        }
+        if (!string.IsNullOrWhiteSpace(parsed.FaultingInstruction) && !string.IsNullOrWhiteSpace(parsed.PointerAnalysis))
+        {
+            lines.Add(parsed.PointerAnalysis);
+        }
+        var indirect = thirdPartyDrivers.Where(x => !x.DirectFault && !x.ProbablyCausedBy && x.StackOccurrences > 0).ToList();
+        if (indirect.Count > 0)
+        {
+            lines.Add(string.Join(" ", indirect.Select(x => $"{x.DisplayName} ({x.DriverName}) stack'te {x.StackOccurrences} kez goruluyor ancak dogrudan cokme noktasi degil; ikincil supheli olarak degerlendiriliyor.")));
+        }
+        if (!string.IsNullOrWhiteSpace(parsed.ProcessName))
+        {
+            lines.Add($"PROCESS_NAME {parsed.ProcessName}, yalnizca cokme aninda aktif islemdir ve tek basina kok neden kaniti degildir.");
+        }
+        if (lines.Count == 0) lines.Add("Minidump, ek teknik yorum icin yeterli exception/context kaniti icermiyor.");
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string DowngradeConfidence(string confidence) => confidence switch
+    {
+        "Yuksek" => "Orta-Yuksek",
+        "Orta-Yuksek" => "Orta",
+        "Orta" => "Dusuk-Orta",
+        _ => confidence
+    };
+
+    private static bool IsKernelComponent(string value)
+    {
+        var token = Path.GetFileName(value ?? "");
+        return token.Equals("nt", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("ntoskrnl.exe", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("ntkrnlmp.exe", StringComparison.OrdinalIgnoreCase) ||
+               token.Equals("ntkrnlmp", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool SameModule(string left, string right)
+    {
+        static string Identity(string value)
+        {
+            var token = Regex.Match(value ?? "", @"(?i)\b[a-z0-9_.-]+(?:\.sys|\.dll|\.exe)?\b").Value;
+            return Path.GetFileNameWithoutExtension(token);
+        }
+        var a = Identity(left);
+        var b = Identity(right);
+        return !string.IsNullOrWhiteSpace(a) && a.Equals(b, StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool HasAnalysisFields(string output)
@@ -819,15 +835,4 @@ public sealed class AdvancedDumpAnalysisService
 
     private sealed record CorrelationResult(string Text, bool HasWhea, bool HasStorage, bool HasDisplay);
 
-    internal sealed record ParsedDebuggerOutput(
-        string BugCheckCode,
-        string BugCheckName,
-        string Parameters,
-        string ProbablyCausedBy,
-        string ImageName,
-        string ModuleName,
-        string ProcessName,
-        string FailureBucket,
-        string SymbolName,
-        IReadOnlyList<string> StackCandidates);
 }

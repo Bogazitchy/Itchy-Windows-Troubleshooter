@@ -719,6 +719,84 @@
                             </StackPanel>
                         </Border>
                         <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">
+                            <TabItem Header="Genel Teshis">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,10,0,0">
+                                    <StackPanel>
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Text="ANALIZ OZETI" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" FontSize="12"/>
+                                                <TextBlock Text="{Binding CrossDumpAnalysis.Summary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" FontSize="15" FontWeight="SemiBold" Margin="0,8,0,0" LineHeight="22"/>
+                                                <TextBlock Text="ORTAK DESEN" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" FontSize="12" Margin="0,16,0,0"/>
+                                                <TextBlock Text="{Binding CrossDumpAnalysis.CommonPattern}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,7,0,0" LineHeight="21"/>
+                                                <TextBlock Text="GENEL TESHIS" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" FontSize="12" Margin="0,16,0,0"/>
+                                                <TextBlock Text="{Binding CrossDumpAnalysis.Diagnosis}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" FontSize="15" FontWeight="SemiBold" Margin="0,7,0,0" LineHeight="22"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Text="En Guclu Kok Neden Adaylari" Style="{StaticResource SectionTitle}"/>
+                                                <ItemsControl ItemsSource="{Binding CrossDumpAnalysis.Candidates}" Margin="0,8,0,0">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="0,10">
+                                                                <Grid>
+                                                                    <Grid.ColumnDefinitions>
+                                                                        <ColumnDefinition Width="220"/>
+                                                                        <ColumnDefinition Width="*"/>
+                                                                    </Grid.ColumnDefinitions>
+                                                                    <StackPanel>
+                                                                        <TextBlock Text="{Binding Title}" FontWeight="Bold" TextWrapping="Wrap"/>
+                                                                        <TextBlock Text="{Binding Strength}" Foreground="#FFD580" FontWeight="Bold" Margin="0,3,0,0"/>
+                                                                    </StackPanel>
+                                                                    <StackPanel Grid.Column="1">
+                                                                        <TextBlock Text="{Binding Evidence}" Style="{StaticResource CopyableText}" TextWrapping="Wrap"/>
+                                                                        <TextBlock Text="{Binding Interpretation}" Style="{StaticResource CopyableText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Text="Kanit ve Teknik Yorum" Style="{StaticResource SectionTitle}"/>
+                                                <TextBlock Text="KANIT" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" Margin="0,10,0,0"/>
+                                                <TextBlock Text="{Binding CrossDumpAnalysis.EvidenceSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0" LineHeight="20"/>
+                                                <TextBlock Text="YORUM" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" Margin="0,14,0,0"/>
+                                                <TextBlock Text="{Binding CrossDumpAnalysis.InterpretationSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0" LineHeight="20"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Text="Onerilen Troubleshooting Sirasi" Style="{StaticResource SectionTitle}"/>
+                                                <TextBlock Text="{Binding CrossDumpAnalysis.TroubleshootingSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,9,0,0" LineHeight="22"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Style="{StaticResource Card}">
+                                            <StackPanel>
+                                                <TextBlock Text="Dump Karsilastirmasi" Style="{StaticResource SectionTitle}"/>
+                                                <DataGrid ItemsSource="{Binding DumpAnalyses}" AutoGenerateColumns="False" IsReadOnly="True" Height="280" Margin="0,10,0,0">
+                                                    <DataGrid.Columns>
+                                                        <DataGridTextColumn Header="Dump" Binding="{Binding FileName}" Width="180"/>
+                                                        <DataGridTextColumn Header="Stop Code" Binding="{Binding BugCheckCode}" Width="90"/>
+                                                        <DataGridTextColumn Header="Stop Adi" Binding="{Binding BugCheckName}" Width="230"/>
+                                                        <DataGridTextColumn Header="Exception" Binding="{Binding ExceptionSummary}" Width="210"/>
+                                                        <DataGridTextColumn Header="Faulting Module" Binding="{Binding FaultingModule}" Width="150"/>
+                                                        <DataGridTextColumn Header="Process" Binding="{Binding ProcessName}" Width="145"/>
+                                                        <DataGridTextColumn Header="Onemli Stack Suruculeri" Binding="{Binding ImportantThirdPartyDriversText}" Width="*"/>
+                                                    </DataGrid.Columns>
+                                                </DataGrid>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </ScrollViewer>
+                            </TabItem>
                             <TabItem Header="Derin Dump Analizi">
                                 <ListBox ItemsSource="{Binding DumpAnalyses}" Background="Transparent" BorderThickness="0" Foreground="{StaticResource TextBrush}"
                                          HorizontalContentAlignment="Stretch" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Margin="0,10,0,0">
@@ -731,6 +809,28 @@
                                                         <TextBlock Text="{Binding FileName}" FontWeight="Bold" FontSize="17" TextWrapping="Wrap"/>
                                                     </DockPanel>
                                                     <TextBlock Text="{Binding RootCauseSummary}" Style="{StaticResource CopyableText}" Foreground="{StaticResource TextBrush}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,8,0,10"/>
+                                                    <Border Background="{StaticResource InsetBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,12">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="1.1*"/>
+                                                                <ColumnDefinition Width="1.3*"/>
+                                                                <ColumnDefinition Width="1.2*"/>
+                                                            </Grid.ColumnDefinitions>
+                                                            <StackPanel Margin="0,0,14,0">
+                                                                <TextBlock Text="EXCEPTION" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" FontSize="11"/>
+                                                                <TextBlock Text="{Binding ExceptionSummary}" Style="{StaticResource CopyableText}" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="1" Margin="0,0,14,0">
+                                                                <TextBlock Text="FAULTING INSTRUCTION" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" FontSize="11"/>
+                                                                <TextBlock Text="{Binding FaultingModule}" Style="{StaticResource CopyableText}" Foreground="#FFD580" FontWeight="Bold" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                                                <TextBlock Text="{Binding FaultingInstruction}" Style="{StaticResource CopyableText}" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                                                            </StackPanel>
+                                                            <StackPanel Grid.Column="2">
+                                                                <TextBlock Text="UCUNCU PARTI STACK" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" FontSize="11"/>
+                                                                <TextBlock Text="{Binding ImportantThirdPartyDriversText}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0"/>
+                                                            </StackPanel>
+                                                        </Grid>
+                                                    </Border>
                                                     <Grid>
                                                         <Grid.ColumnDefinitions>
                                                             <ColumnDefinition Width="160"/>
@@ -756,13 +856,23 @@
                                                         </StackPanel>
                                                         <TextBlock Grid.Row="4" Text="Dosya / analiz" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding IntegrityStatus}" TextWrapping="Wrap" Margin="0,5,0,0"/>
-                                                        <TextBlock Grid.Row="5" Text="Kanit" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
+                                                        <TextBlock Grid.Row="5" Text="Kanit (debugger)" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Evidence}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="6" Text="Onerilen islem" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Recommendation}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0" Foreground="#C9D1D9"/>
                                                         <TextBlock Grid.Row="7" Text="Debugger" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding DebuggerUsed}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                     </Grid>
+                                                    <Expander Header="Teknik yorum, context ve pointer kaniti" Margin="0,10,0,0" Foreground="{StaticResource AccentBrush}">
+                                                        <StackPanel Margin="0,8,0,0">
+                                                            <TextBlock Text="YORUM" Foreground="{StaticResource MutedBrush}" FontWeight="Bold"/>
+                                                            <TextBlock Text="{Binding TechnicalInterpretation}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" Margin="0,4,0,0"/>
+                                                            <TextBlock Text="CONTEXT" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" Margin="0,12,0,0"/>
+                                                            <TextBlock Text="{Binding RegisterContextStatus}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                            <TextBlock Text="{Binding RegisterSummary}" Style="{StaticResource CopyableText}" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                                                            <TextBlock Text="{Binding PointerAnalysis}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                                        </StackPanel>
+                                                    </Expander>
                                                     <Expander Header="Ham WinDbg ciktisi ve teknik ayrintilar" Margin="0,10,0,0" Foreground="{StaticResource AccentBrush}">
                                                         <TextBox Text="{Binding RawDebuggerOutput}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                                                                  FontFamily="Consolas" FontSize="12" Height="260" Margin="0,8,0,0"

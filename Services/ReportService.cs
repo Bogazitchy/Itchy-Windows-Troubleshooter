@@ -86,7 +86,18 @@ public sealed class ReportService
         EndSection(html);
 
         BeginSection(html, "bsod", "Mavi Ekran ve Dump", "Stop code, surucu, stack ve olay korelasyonu");
-        html.AppendLine($"<article class='card summary-card' data-searchable><h3>Derin Analiz Ozeti</h3><p>{E(s.BlueScreenSummary)}</p></article>");
+        AppendCrossDumpAnalysis(html, s.CrossDumpAnalysis);
+        AppendTable(html, "Dump Karsilastirmasi",
+            ["Dump", "Stop Code", "Exception", "Faulting Module", "Process", "Onemli Stack Suruculeri"],
+            s.DumpAnalyses.Select(x => new[]
+            {
+                x.FileName,
+                $"{x.BugCheckCode} {x.BugCheckName}".Trim(),
+                x.ExceptionSummary,
+                x.FaultingModule,
+                x.ProcessName,
+                x.ImportantThirdPartyDriversText
+            }));
         AppendDumpAnalyses(html, s.DumpAnalyses);
         AppendTable(html, "Mavi Ekran Olay ve Dosya Sinyalleri", ["Zaman", "Baslik", "Ozet", "Teknik Detay"], s.BlueScreens.Select(x => new[] { x.TimeCreated?.ToString("dd.MM.yyyy HH:mm") ?? "", x.Title, x.Summary, x.TechnicalDetail }));
         EndSection(html);
@@ -160,6 +171,30 @@ public sealed class ReportService
         text.AppendLine("Mavi Ekran Derin Analiz Ozeti");
         text.AppendLine(s.BlueScreenSummary);
         text.AppendLine();
+        text.AppendLine("Mavi Ekran Genel Teshisi");
+        text.AppendLine(s.CrossDumpAnalysis.Summary);
+        text.AppendLine();
+        text.AppendLine("Ortak Dump Desenleri");
+        text.AppendLine(s.CrossDumpAnalysis.CommonPattern);
+        text.AppendLine(s.CrossDumpAnalysis.EvidenceSummary);
+        text.AppendLine();
+        text.AppendLine("Supheli Kaynaklar");
+        foreach (var candidate in s.CrossDumpAnalysis.Candidates)
+        {
+            text.AppendLine($"{candidate.Title} - {candidate.Strength}");
+            text.AppendLine($"Kanit: {candidate.Evidence}");
+            text.AppendLine($"Yorum: {candidate.Interpretation}");
+        }
+        text.AppendLine();
+        text.AppendLine("Onerilen Troubleshooting Sirasi");
+        text.AppendLine(s.CrossDumpAnalysis.TroubleshootingSummary);
+        text.AppendLine();
+        text.AppendLine("Dump Karsilastirmasi");
+        foreach (var item in s.DumpAnalyses)
+        {
+            text.AppendLine($"{item.FileName} | {item.BugCheckCode} {item.BugCheckName} | {item.ExceptionSummary} | {item.FaultingModule} | {item.ProcessName} | {item.ImportantThirdPartyDriversText}");
+        }
+        text.AppendLine();
         text.AppendLine("Sistem Ozeti");
         text.AppendLine(s.SystemInfo);
         text.AppendLine("Bulgular");
@@ -182,13 +217,25 @@ public sealed class ReportService
             text.AppendLine($"Dosya: {item.FileName} ({item.FilePath})");
             text.AppendLine($"Durum: {item.AnalysisStatus}; Butunluk: {item.IntegrityStatus}");
             text.AppendLine($"BugCheck: {item.BugCheckCode} {item.BugCheckName}");
+            text.AppendLine($"Exception: {item.ExceptionSummary}");
+            text.AppendLine($"Faulting: {item.FaultingAddress} {item.FaultingModule} {item.FaultingSymbol} - {item.FaultingInstruction}".Trim());
+            text.AppendLine($"Ucuncu parti stack: {item.ImportantThirdPartyDriversText}");
             text.AppendLine($"Supheli: {item.SuspectedComponent}; Guven: {item.Confidence}");
-            text.AppendLine($"Sonuc: {item.RootCauseSummary}");
             text.AppendLine($"Kanit: {item.Evidence}");
+            text.AppendLine($"Yorum: {item.TechnicalInterpretation}");
+            text.AppendLine($"Teshis: {item.RootCauseSummary}");
+            text.AppendLine($"Context: {item.RegisterContextStatus} {item.RegisterSummary}");
+            text.AppendLine($"Pointer: {item.PointerAnalysis}");
             text.AppendLine($"Eslesen olaylar: {item.CorrelatedEvents}");
             text.AppendLine($"Oneri: {item.Recommendation}");
             text.AppendLine($"Debugger: {item.DebuggerUsed}");
-            text.AppendLine("Ham debugger ciktisi:");
+            text.AppendLine();
+        }
+
+        text.AppendLine("Ham WinDbg Ciktilari");
+        foreach (var item in s.DumpAnalyses)
+        {
+            text.AppendLine($"===== {item.FileName} =====");
             text.AppendLine(item.RawDebuggerOutput);
             text.AppendLine();
         }
@@ -357,6 +404,23 @@ public sealed class ReportService
         html.AppendLine("</tbody></table></div>");
     }
 
+    private static void AppendCrossDumpAnalysis(StringBuilder html, CrossDumpAnalysisResult analysis)
+    {
+        html.AppendLine($"<article class='card summary-card' data-searchable><h3>Mavi Ekran Genel Teshisi</h3><p>{E(analysis.Summary)}</p><p><b>{E(analysis.Diagnosis)}</b></p></article>");
+        html.AppendLine($"<article class='card' data-searchable><h3>Ortak Dump Desenleri</h3><p style='white-space:pre-line'>{E(analysis.CommonPattern)}</p><p style='white-space:pre-line'><span class='label'>Kanit</span><br>{E(analysis.EvidenceSummary)}</p><p style='white-space:pre-line'><span class='label'>Yorum</span><br>{E(analysis.InterpretationSummary)}</p></article>");
+        AppendTable(html, "Supheli Kaynaklar",
+            ["Oncelik", "Aday", "Kanit Gucu", "Dogrudan Kanit", "Teknik Yorum"],
+            analysis.Candidates.Select((x, index) => new[]
+            {
+                (index + 1).ToString(),
+                x.Title,
+                x.Strength,
+                x.Evidence,
+                x.Interpretation
+            }));
+        html.AppendLine($"<article class='card' data-searchable><h3>Onerilen Troubleshooting Sirasi</h3><p style='white-space:pre-line'>{E(analysis.TroubleshootingSummary)}</p></article>");
+    }
+
     private static void AppendDumpAnalyses(StringBuilder html, IReadOnlyList<DumpAnalysisItem> analyses)
     {
         html.AppendLine($"<div class='table-title'><h3>Derin Dump Analizleri</h3><span class='pill'>{analyses.Count} dump</span></div>");
@@ -374,14 +438,26 @@ public sealed class ReportService
             AppendPair(html, "Dosya", $"{item.FilePath} ({item.FileSize}, {item.CreatedAt:dd.MM.yyyy HH:mm})");
             AppendPair(html, "Butunluk", item.IntegrityStatus);
             AppendPair(html, "Analiz durumu", item.AnalysisStatus);
+            AppendPair(html, "Exception", item.ExceptionSummary);
+            AppendPair(html, "Faulting address", item.FaultingAddress);
+            AppendPair(html, "Faulting module / symbol", $"{item.FaultingModule} {item.FaultingSymbol}".Trim());
+            AppendPair(html, "Faulting instruction", item.FaultingInstruction);
+            AppendPair(html, "Probably caused by", item.ProbablyCausedBy);
+            AppendPair(html, "IMAGE / MODULE / SYMBOL", $"{item.ImageName} / {item.ModuleName} / {item.SymbolName}");
             AppendPair(html, "Supheli bilesen", item.SuspectedComponent);
             AppendPair(html, "Guven", item.Confidence);
             AppendPair(html, "Bilesen ayrintisi", item.ComponentDetails);
             AppendPair(html, "Surec", item.ProcessName);
             AppendPair(html, "Failure bucket", item.FailureBucket);
+            AppendPair(html, "Failure ID hash", item.FailureIdHash);
             AppendPair(html, "Parametreler", item.BugCheckParameters);
-            AppendPair(html, "Sonuc", item.RootCauseSummary);
             AppendPair(html, "Kanit", item.Evidence);
+            AppendPair(html, "Yorum", item.TechnicalInterpretation);
+            AppendPair(html, "Teshis", item.RootCauseSummary);
+            AppendPair(html, "Ucuncu parti stack suruculeri", item.ImportantThirdPartyDriversText);
+            AppendPair(html, "Register context", item.RegisterContextStatus);
+            AppendPair(html, "Registerlar", item.RegisterSummary);
+            AppendPair(html, "Pointer analizi", item.PointerAnalysis);
             AppendPair(html, "Eslesen olaylar", item.CorrelatedEvents);
             AppendPair(html, "Oneri", item.Recommendation);
             AppendPair(html, "Debugger", item.DebuggerUsed);

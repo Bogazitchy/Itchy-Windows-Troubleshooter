@@ -41,6 +41,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _headerSummary = "Genel tarama baslatildiginda Windows kayitlari ve temel sistem durumu okunur.";
     private string _analysisSummary = "Tarama sonrasinda burada sade analiz sonucu gorunecek.";
     private string _blueScreenSummary = "Derin dump analizi henuz calistirilmadi.";
+    private CrossDumpAnalysisResult _crossDumpAnalysis = CrossDumpAnalysisResult.Empty;
     private string _adminStatus = "";
     private string _systemInfoText = "";
     private string _lastScanText = "Henuz yok";
@@ -93,6 +94,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string HeaderSummary { get => _headerSummary; set => SetField(ref _headerSummary, value); }
     public string AnalysisSummary { get => _analysisSummary; set => SetField(ref _analysisSummary, value); }
     public string BlueScreenSummary { get => _blueScreenSummary; set => SetField(ref _blueScreenSummary, value); }
+    public CrossDumpAnalysisResult CrossDumpAnalysis { get => _crossDumpAnalysis; set => SetField(ref _crossDumpAnalysis, value); }
     public string AdminStatus { get => _adminStatus; set => SetField(ref _adminStatus, value); }
     public string SystemInfoText { get => _systemInfoText; set => SetField(ref _systemInfoText, value); }
     public string LastScanText { get => _lastScanText; set => SetField(ref _lastScanText, value); }
@@ -222,6 +224,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             BlueScreenItems.Clear();
             DumpAnalyses.Clear();
             BlueScreenSummary = "Dump dosyalari ve semboller analiz ediliyor...";
+            CrossDumpAnalysis = CrossDumpAnalysisResult.Empty;
             var result = await _analysisService.AnalyzeBlueScreensAsync(token);
             ApplyBlueScreenResult(result);
         });
@@ -234,7 +237,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Title = "Analiz edilecek dump dosyasini secin",
             Filter = "Windows dump dosyalari (*.dmp;*.mdmp;*.hdmp;*.kdmp)|*.dmp;*.mdmp;*.hdmp;*.kdmp|Tum dosyalar (*.*)|*.*",
             CheckFileExists = true,
-            Multiselect = false
+            Multiselect = true
         };
         if (dialog.ShowDialog(this) != true)
         {
@@ -245,8 +248,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             BlueScreenItems.Clear();
             DumpAnalyses.Clear();
-            BlueScreenSummary = $"{Path.GetFileName(dialog.FileName)} analiz ediliyor...";
-            var result = await _analysisService.AnalyzeSelectedDumpAsync(dialog.FileName, token);
+            BlueScreenSummary = $"{dialog.FileNames.Length} dump dosyasi analiz ediliyor...";
+            CrossDumpAnalysis = CrossDumpAnalysisResult.Empty;
+            var result = await _analysisService.AnalyzeSelectedDumpsAsync(dialog.FileNames, token);
             ApplyBlueScreenResult(result);
         });
     }
@@ -396,7 +400,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 RestorePoints.ToList(),
                 RepairHistory.ToList(),
                 ProtectionStatus,
-                LiveLog);
+                LiveLog)
+            {
+                CrossDumpAnalysis = CrossDumpAnalysis
+            };
 
             var report = await _reportService.CreateReportAsync(snapshot, token);
             ReportPath = $"Rapor olusturuldu:\nHTML: {report.HtmlPath}\nTXT: {report.TextPath}";
@@ -635,6 +642,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         HeaderSummary = $"{CriticalCount} kritik bulgu, {WarningCount} uyari, {InfoCount} bilgi. Tarama kapsami %{coverageScore}.";
         AnalysisSummary = result.UserSummary;
         BlueScreenSummary = result.BlueScreenSummary;
+        CrossDumpAnalysis = result.CrossDumpAnalysis;
         LastScanText = DateTime.Now.ToString("dd.MM.yyyy HH:mm");
         SystemInfoText = result.SystemInfo;
         TemperatureRefreshText = $"Sicakliklar her dakika yenilenir. Son yenileme: {DateTime.Now:HH:mm:ss}";
@@ -670,11 +678,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ScanStage = "Tarama hazirlaniyor";
         AnalysisSummary = "Tarama calisiyor. Event Viewer, Guvenilirlik Gecmisi, kaynak kullanimi, aygitlar, suruculer ve donanim sensorleri okunuyor.";
         BlueScreenSummary = "Dump dosyalari, stop code, semboller, stack ve olay korelasyonu analiz ediliyor.";
+        CrossDumpAnalysis = CrossDumpAnalysisResult.Empty;
     }
 
     private void ApplyBlueScreenResult(BlueScreenScanResult result)
     {
         BlueScreenSummary = result.Summary;
+        CrossDumpAnalysis = result.CrossDumpAnalysis;
         foreach (var item in result.DumpAnalyses)
         {
             DumpAnalyses.Add(item);

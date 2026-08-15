@@ -15,19 +15,20 @@
 
 ![ITCHY sistem bilgileri ekrani](docs/images/system-information.png)
 
-## v1.3.0: Daha Net Teshis
+## Guncel Gelistirme: Karsilastirmali Dump Teshisi
 
-Bu surum yeni arac kalabaligi eklemek yerine mevcut tarama ve sonuc motorunu daha guvenilir hale getirir.
+ITCHY artik birden fazla dump dosyasini yalnizca tek tek listelemek yerine ayni bilgisayara ait bir vaka grubu olarak yorumlar. WinDbg kanitlari, stack suruculeri, exception desenleri ve dump zamanindaki Windows olaylari bir araya getirilerek teknisyen seviyesinde bir **Genel Teshis** uretilir.
 
 | Iyilestirme | Kullaniciya etkisi |
 |---|---|
-| Kanit rolleri | Kok neden adayi, dogrudan ariza, cokme kaniti, yapilandirma ve sonuc olaylari birbirinden ayrilir |
-| Guven puani | Eski ve tek kaynakli kayitlar daha dusuk puanlanir; yuzde 90 ustu sonuc guclu veya cok kaynakli kanit gerektirir |
-| Sonuc ozeti | Bilesen, guven, tekrar, guncellik, mavi ekran iliskisi ve ilk yapilacak islem tek yerde gorunur |
-| Yanlis pozitif kontrolu | Kernel-Power ve zaman eslesmesi olmayan Code Integrity olaylari otomatik olarak kok neden sayilmaz |
-| Gruplama | Tekrarlayan uygulama, servis, surucu ve Reliability kayitlari bilesen bazinda birlestirilir |
-| Tarama durumu | Olay kayitlari, sistem sagligi, kaynak kullanimi ve dump analizi asamalari canli gosterilir |
-| Teknik rapor | Ilk uc bulgu acik gelir; ham kayitlar kapali tutulur ve bulgudan ilgili kanita tek tikla gecilir |
+| Exception analizi | `0xC0000005` gibi exception kodlari Access Violation olarak aciklanir; Read, Write veya Execute erisimi ve hedef adres ayrica gosterilir |
+| Faulting instruction | Gercek debugger context'i varsa faulting adres, modul, sembol, assembly komutu ve ilgili register degerleri saklanir |
+| Dump korelasyonu | BugCheck, exception, pointer deseni, process, driver ailesi ve stack tekrar oranlari tum dump'lar arasinda karsilastirilir |
+| Kanit siniflandirmasi | Debugger verisi, teknik yorum ve kok neden teshisi birbirinden acikca ayrilir |
+| Surucu rolleri | Dogrudan fault, `Probably caused by`, `IMAGE_NAME`, `MODULE_NAME` ve yalnizca stack varligi farkli agirliklarla degerlendirilir |
+| Yanlis pozitif kontrolu | `ntoskrnl.exe`, aktif kullanici process'i ve Kernel-Power 41 tek basina asil neden kabul edilmez |
+| Kanita dayali plan | DDU, surucu izolasyonu, XMP/OC kapatma ve MemTest86 adimlari yalnizca ilgili kanit varsa siralanir |
+| Teknik rapor | Genel teshis, ortak desenler, supheliler, dump karsilastirmasi ve ham WinDbg ciktilari katmanli sunulur |
 
 ## Neden ITCHY?
 
@@ -35,9 +36,9 @@ Windows mavi ekranlari genellikle tek bir kaynaktan anlasilmaz. `ntoskrnl.exe`, 
 
 | Alan | ITCHY ne yapar? |
 |---|---|
-| Mavi ekran | Minidump ve `MEMORY.DMP` dosyalarini WinDbg sembolleriyle analiz eder |
-| Kok neden | Stop code, stack, modul, process, failure bucket ve `.sys` surucusunu ayirir |
-| Korelasyon | WHEA, disk, NVMe, NTFS, GPU, Kernel-PnP ve BugCheck olaylarini zamanla eslestirir |
+| Mavi ekran | Bir veya birden fazla minidump / `MEMORY.DMP` dosyasini WinDbg sembolleriyle analiz eder |
+| Kok neden | Stop code, exception, faulting instruction, context, register, stack ve `.sys` surucu rollerini ayirir |
+| Korelasyon | Dump'lari kendi aralarinda; WHEA, disk, NVMe, NTFS, GPU, Kernel-PnP ve BugCheck olaylarini zamanla karsilastirir |
 | Genel tarama | Event Viewer, Reliability, aygitlar, suruculer ve kaynak kullanimini rol, guncellik ve guven puaniyla birlestirir |
 | Sistem sagligi | Disk/SMART, pagefile, dump ayari, bellek testi, yeniden baslatma ve DISM durumunu kontrol eder |
 | Tarama kapsami | Okunan, kismi kalan ve erisilemeyen kaynaklari ayri gosterir; eksik veriyi temiz sonuc saymaz |
@@ -50,15 +51,50 @@ Windows mavi ekranlari genellikle tek bir kaynaktan anlasilmaz. `ntoskrnl.exe`, 
 
 ![ITCHY mavi ekran analiz ekrani](docs/images/blue-screen-analysis.png)
 
-1. `C:\Windows\Minidump`, `C:\Windows\MEMORY.DMP` veya elle secilen dump dosyasi bulunur.
+```mermaid
+flowchart LR
+    A["Dump dosyalari"] --> B["WinDbg ve baslik analizi"]
+    B --> C["Exception / context / stack parser"]
+    C --> D["Surucu ailesi ve rol siniflandirmasi"]
+    D --> E["Dump'lar arasi korelasyon"]
+    F["Event Viewer +/-20 dakika"] --> E
+    E --> G["Kanit"]
+    E --> H["Teknik yorum"]
+    E --> I["Sirali kok neden adaylari"]
+    I --> J["Kanita dayali islem plani"]
+```
+
+1. `C:\Windows\Minidump`, `C:\Windows\MEMORY.DMP` veya birlikte secilen dump dosyalari bulunur.
 2. Dosya butunlugu ve kernel dump basligi kontrol edilir; okunabilirse BugCheck kodu ve dort parametre cikarilir.
-3. Microsoft WinDbg/KD/CDB ile `!analyze -v`, `.bugcheck`, `kv`, modul listesi ve blackbox verileri toplanir.
-4. `Probably caused by`, `IMAGE_NAME`, `MODULE_NAME`, `PROCESS_NAME`, `FAILURE_BUCKET_ID`, `SYMBOL_NAME` ve stack adaylari ayristirilir.
-5. `ntoskrnl.exe` tek basina asil neden kabul edilmez. Stack'teki anlamli surucu, dosya ureticisi ve tekrar eden dump sonuclari oncelenir.
-6. Dump zamaninin +/-20 dakikasindaki WHEA, disk, GPU, NTFS ve guc olaylari eslestirilir.
-7. Kullaniciya supheli bilesen, guven seviyesi, kanitlar ve onerilen islem gosterilir.
+3. Microsoft WinDbg/KD/CDB ile `!analyze -v`, `.bugcheck`, `kv`, modul listesi, register, disassembly ve blackbox verileri toplanir.
+4. `BUGCHECK_CODE`, `EXCEPTION_CODE`, `FAULTING_IP`, `CONTEXT`, `PROCESS_NAME`, `IMAGE_NAME`, `MODULE_NAME`, `SYMBOL_NAME`, failure bucket/hash ve stack alanlari toleransli olarak ayristirilir.
+5. 0x3B ve 0x7E gibi uygun stop code'larda gercek context record varsa `.cxr`, `r`, `kv` ve `u @rip-20 L40` ile ikinci analiz gecisi yapilir.
+6. Stack'teki Windows/framework modulleri ile ucuncu parti kernel suruculeri ayrilir; her surucunun tekrar sayisi ve cokmedeki rolu hesaplanir.
+7. Tum dump'larda BugCheck, exception, gecersiz adres, faulting modul, process, driver ailesi ve bellek bozulmasi desenleri karsilastirilir.
+8. Dump zamaninin +/-20 dakikasindaki WHEA, Display, disk/NVMe, NTFS, Kernel-PnP ve BugCheck olaylari korelasyona eklenir.
+9. Grafik surucusu, kernel surucu cakismasi, bellek/CPU kararliligi, depolama, ag ve donanim kategorileri kanit gucune gore siralanir.
+
+### Ornek toplu sonuc
+
+```text
+4 dump dosyasi incelendi.
+3 x KMODE_EXCEPTION_NOT_HANDLED (0x1E)
+1 x SYSTEM_SERVICE_EXCEPTION (0x3B)
+
+4/4 dump: 0xC0000005 Access Violation.
+Bir dump dogrudan nvlddmkm.sys icinde coktu.
+Cokmeler farkli kullanici process'leri sirasinda olustu.
+
+En guclu yazilimsal supheli: NVIDIA Display Driver.
+Ikincil aday: ucuncu parti kernel surucusu cakismasi.
+RAM / XMP / CPU bellek kararliligi test edilmelidir.
+```
 
 > Tek bir dump fiziksel donanimi her durumda kesin kanitlamaz. RAM, CPU, PCIe ve guc sorunlarinda guven seviyesi ile olay korelasyonu birlikte degerlendirilmelidir.
+
+### Lokal ve deterministik
+
+Dump analizi icin OpenAI, Gemini, Claude veya baska bir harici AI servisi kullanilmaz. Teshis; WinDbg ciktisi, bakimi yapilabilir bugcheck bilgisi, surucu siniflandirmasi ve lokal kural/korelasyon motoruyla uretilir. Dump dosyalari yuklenmez; internet yalnizca Microsoft public symbol server sembolleri icin kullanilabilir.
 
 ## Sekmeli Teknisyen Raporu
 
@@ -74,7 +110,7 @@ HTML rapor artik tek parca uzun bir sayfa degildir. Asagidaki sekmeler arasinda 
 - Koruma ve Onarim
 - Ham Uygulama Logu
 
-Ilk uc onemli bulgu dogrudan acilir; ayrintili ve ham kayitlar raporu bogmamasi icin kapali bolumlerde tutulur. Hata ve Reliability kayitlari bilesen bazinda gruplanir. Bulgu kartindaki ilgili kayit dugmesi, Hata Kayitlari sekmesine gecip kaniti otomatik arar. Tablolar sabit baslikli ve kaydirilabilir yapidadir; yazdirma veya PDF alma sirasinda butun sekmeler eksiksiz rapora eklenir.
+Mavi Ekran sekmesi once **Genel Teshis**, **Ortak Dump Desenleri**, **Supheli Kaynaklar**, **Troubleshooting Sirasi** ve **Dump Karsilastirmasi** bolumlerini gosterir. Tek tek dump ayrintilari ve ham WinDbg ciktilari daha sonra gelir. Ilk onemli bulgular dogrudan acilir; ayrintili ve ham kayitlar raporu bogmamasi icin kapali bolumlerde tutulur. Tablolar sabit baslikli ve kaydirilabilir yapidadir; yazdirma veya PDF alma sirasinda butun sekmeler eksiksiz rapora eklenir.
 
 ## Sistem ve Surucu Envanteri
 
@@ -110,6 +146,7 @@ git clone https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter.git
 cd Itchy-Windows-Troubleshooter
 dotnet restore
 dotnet build -c Release
+dotnet test Tests\ItchyWindowsTroubleshooter.Tests.csproj -c Release
 ```
 
 Tek dosyalik self-contained Windows x64 paketi:
@@ -123,13 +160,18 @@ Yayin dosyasi `bin\Release\single-file\ITCHY Windows Troubleshooter.exe` yolunda
 ## Proje Yapisi
 
 ```text
-Models/                         Veri modelleri
-Services/AdvancedDumpAnalysis  WinDbg, stop code, stack ve korelasyon motoru
+Models/                         Dump, korelasyon ve uygulama veri modelleri
+Services/AdvancedDumpAnalysis  WinDbg calistirma ve analiz orkestrasyonu
+Services/WinDbgOutputParser    Exception, context, register, stack ve disassembly parser'i
+Services/BugCheckKnowledgeBase Stop code semantigi ve parametre bilgisi
+Services/DriverClassification  Windows/ucuncu parti surucu ve aile tanima katmani
+Services/DumpCorrelation       Coklu dump kok neden skorlama ve islem sirasi
 Services/SystemAnalysis        Event Viewer ve genel teshis kurallari
-Services/SystemHealthAnalysis Disk/SMART, dump, bellek ve Windows saglik denetimleri
+Services/SystemHealthAnalysis  Disk/SMART, dump, bellek ve Windows saglik denetimleri
 Services/SystemInventory       Sistem, BIOS ve surucu envanteri
 Services/HardwareSensor        CPU/GPU sensorleri
 Services/ReportService         Sekmeli HTML/TXT rapor motoru
+Tests/                          Sentetik WinDbg parser ve korelasyon testleri
 MainWindow.xaml                WPF kullanici arayuzu
 ```
 
