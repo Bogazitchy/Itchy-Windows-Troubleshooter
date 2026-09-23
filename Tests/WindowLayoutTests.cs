@@ -19,6 +19,7 @@ public sealed class WindowLayoutTests
             try
             {
                 var window = new MainWindow(initializeBackgroundServices: false);
+                Assert.NotNull(window.Icon);
                 var root = (Grid)window.Content;
                 root.Background = window.Background;
                 foreach (var (width, height) in new[] { (1320, 820), (1093, 560), (910, 470) })
@@ -27,6 +28,8 @@ public sealed class WindowLayoutTests
                     root.Measure(new Size(width, height));
                     root.Arrange(new Rect(0, 0, width, height));
                     root.UpdateLayout();
+                    var logo = Assert.Single(Descendants(root).OfType<Image>(), x => x.Source is BitmapSource { PixelWidth: 1254 });
+                    Assert.True(logo.ActualWidth > 0);
                     var tabs = Descendants(root).OfType<TabControl>().First();
                     foreach (var tab in tabs.Items.OfType<TabItem>().Where(x => x.Header?.ToString() is "Ana Panel" or "Onarım Araçları" or "Mavi Ekran"))
                     {

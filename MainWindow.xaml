@@ -6,7 +6,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="ITCHY Windows Troubleshooter" Height="860" Width="1320" MinHeight="440" MinWidth="800"
-        Background="#0D1117" Foreground="#F0F6FC" WindowStartupLocation="CenterScreen"
+        Background="#0D1117" Foreground="#F0F6FC" WindowStartupLocation="CenterScreen" Icon="Assets/itchy.ico"
         FontFamily="Segoe UI" FontSize="13">
     <Window.Resources>
         <SolidColorBrush x:Key="BackgroundBrush" Color="#0D1117"/>
@@ -470,11 +470,11 @@
                 <StackPanel DockPanel.Dock="Top">
                     <Grid Margin="0,2,0,22">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="44"/>
+                            <ColumnDefinition Width="60"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
-                        <Border Width="40" Height="40" Background="{StaticResource AccentBrush}" CornerRadius="7" HorizontalAlignment="Left">
-                            <TextBlock Text="I" FontSize="22" FontWeight="Black" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Width="56" Height="56" Background="#FFFFFF" CornerRadius="6" HorizontalAlignment="Left">
+                            <Image Source="Assets/itchy-logo.png" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="ITCHY Windows Troubleshooter logosu"/>
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0">
                             <TextBlock Text="ITCHY" FontSize="21" FontWeight="Black" Foreground="{StaticResource TextBrush}"/>
@@ -1102,6 +1102,9 @@
                     <Border Style="{StaticResource Card}" Margin="0,14,0,0">
                         <StackPanel>
                             <TextBlock Text="Ayarlar" Style="{StaticResource SectionTitle}"/>
+                            <Border Background="#FFFFFF" CornerRadius="6" Width="200" Height="200" HorizontalAlignment="Left" Margin="0,0,0,16">
+                                <Image Source="Assets/itchy-logo.png" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" AutomationProperties.Name="ITCHY Windows Troubleshooter logosu"/>
+                            </Border>
                             <TextBlock Text="ITCHY yerel analiz, kontrollu onarim ve teknisyen raporlama odakli calisir." Style="{StaticResource MutedText}"/>
                             <TextBlock Text="Guvenlik siniri: Registry cleaner, sahte hizlandirma ve onaysiz kritik islem yoktur." Foreground="#C9D1D9" Margin="0,12,0,0"/>
                         </StackPanel>

@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.1 - 2026-09-23
+
+- Resmî ITCHY logosu uygulamanın marka alanına ve Ayarlar bölümüne eklendi.
+- Pencere, görev çubuğu ve EXE için 16-256 piksel çok boyutlu Windows simgesi eklendi.
+- README yeni logo ile güncellendi; orijinal PNG ve simge üretim betiği depoya eklendi.
+
 ## 1.4.0 - 2026-09-23
 
 - Karşılaştırmalı dump analizi; doğrulanmış çökme adresi ve kanıt kaynağı ayrımı.

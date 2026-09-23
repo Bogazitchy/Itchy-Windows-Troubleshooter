@@ -6,11 +6,11 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <ApplicationIcon />
+    <ApplicationIcon>Assets\itchy.ico</ApplicationIcon>
     <AssemblyName>ITCHY Windows Troubleshooter</AssemblyName>
-    <Version>1.4.0</Version>
-    <FileVersion>1.4.0.0</FileVersion>
-    <AssemblyVersion>1.4.0.0</AssemblyVersion>
+    <Version>1.4.1</Version>
+    <FileVersion>1.4.1.0</FileVersion>
+    <AssemblyVersion>1.4.1.0</AssemblyVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors>Bogazitchy</Authors>
     <Description>Windows 10/11 system diagnostics and advanced blue screen dump analysis.</Description>
@@ -19,6 +19,8 @@
 
   <ItemGroup>
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <Resource Include="Assets\itchy-logo.png" />
+    <Resource Include="Assets\itchy.ico" />
   </ItemGroup>
 
   <ItemGroup>

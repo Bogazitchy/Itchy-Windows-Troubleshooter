@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="Assets/itchy-logo.png" width="240" alt="ITCHY Windows Troubleshooter logosu" />
+
 # ITCHY Windows Troubleshooter
 
 **Windows 10/11 için yerel sistem teşhisi, karşılaştırmalı mavi ekran analizi ve teknisyen raporları.**
@@ -9,7 +11,7 @@
 ![.NET](https://img.shields.io/badge/.NET-8-512BD4?style=for-the-badge)
 [![Downloads](https://img.shields.io/github/downloads/Bogazitchy/Itchy-Windows-Troubleshooter/total?style=for-the-badge)](https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter/releases)
 
-[**v1.4.0 EXE indir**](https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter/releases/download/v1.4.0/ITCHY-Windows-Troubleshooter-v1.4.0-win-x64.exe) · [Sürüm notları](docs/releases/v1.4.0.md) · [Hata bildir](https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter/issues)
+[**v1.4.1 EXE indir**](https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter/releases/download/v1.4.1/ITCHY-Windows-Troubleshooter-v1.4.1-win-x64.exe) · [Sürüm notları](docs/releases/v1.4.1.md) · [Hata bildir](https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter/issues)
 
 </div>
 
@@ -21,7 +23,13 @@ ITCHY yalnızca bir stop code veya sürücü adı göstermez. Dump'ları karşı
 
 > Bir sürücünün stack'te bulunması suçlu olduğunu kanıtlamaz. `ntoskrnl.exe`, aktif kullanıcı uygulaması ve Kernel-Power 41 tek başına kök neden sayılmaz.
 
-## v1.4.0 Yenilikleri
+## v1.4.1: Yeni Logo
+
+Resmî ITCHY logosu artık uygulamanın marka alanında, Ayarlar bölümünde, pencere/görev çubuğu simgesinde ve EXE dosyasında kullanılıyor. Şeffaf orijinal PNG korunur; Windows simgesi 16-256 piksel boyutlarını içerir.
+
+![Yeni logolu ITCHY arayüzü](docs/images/branding-v1.4.1.png)
+
+## v1.4 Analiz ve Güvenlik Yenilikleri
 
 | Alan | İyileştirme |
 |---|---|
@@ -88,7 +96,7 @@ Sonuçlar **başarılı / kısmen başarılı / başarısız / yeniden başlatma
 
 ## İndir ve Çalıştır
 
-1. [v1.4.0 release](https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter/releases/tag/v1.4.0) sayfasından `ITCHY-Windows-Troubleshooter-v1.4.0-win-x64.exe` dosyasını indirin.
+1. [v1.4.1 release](https://github.com/Bogazitchy/Itchy-Windows-Troubleshooter/releases/tag/v1.4.1) sayfasından `ITCHY-Windows-Troubleshooter-v1.4.1-win-x64.exe` dosyasını indirin.
 2. EXE'yi çalıştırın. Self-contained Windows x64 paketi ayrı .NET kurulumu gerektirmez.
 3. Korunan dump'lar ve sistem onarımı için yönetici izni gerekebilir.
 4. WinDbg gerekli olduğunda mavi ekran sekmesinin vaka araçları menüsündeki kurulum seçeneğini kullanın.
@@ -96,7 +104,7 @@ Sonuçlar **başarılı / kısmen başarılı / başarısız / yeniden başlatma
 Release'teki `SHA256SUMS.txt` ile indirdiğiniz dosyanın bütünlüğünü kontrol edebilirsiniz:
 
 ```powershell
-Get-FileHash .\ITCHY-Windows-Troubleshooter-v1.4.0-win-x64.exe -Algorithm SHA256
+Get-FileHash .\ITCHY-Windows-Troubleshooter-v1.4.1-win-x64.exe -Algorithm SHA256
 ```
 
 Kod imzası bulunmadığında SmartScreen uyarısı görülebilir. Dosyayı yalnız bu deponun release sayfasından edinin; hash kontrolü dijital imzanın yerine geçmez.
