@@ -33,7 +33,7 @@ public sealed class DriverClassificationService
         new(@"^VBox|^vmnet|^vmusb|^hv", "Virtualization Driver", "Virtualization", RootCauseCategory.KernelDriverConflict)
     };
 
-    public IReadOnlyList<StackDriverEvidence> BuildEvidence(ParsedDebuggerOutput parsed)
+    public IReadOnlyList<StackDriverEvidence> BuildEvidence(ParsedDebuggerOutput parsed, bool allowLocalMetadata = false)
     {
         var modules = new HashSet<string>(parsed.StackModuleOccurrences.Keys, StringComparer.OrdinalIgnoreCase);
         AddModule(modules, parsed.FaultingModule);
@@ -42,7 +42,9 @@ public sealed class DriverClassificationService
         AddModule(modules, ExtractProbablyCausedBy(parsed.ProbablyCausedBy));
 
         return modules
-            .Select(module => Build(module, parsed))
+            .Select(NormalizeDriverName)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Select(module => Build(module, parsed, allowLocalMetadata))
             .Where(x => x.IsThirdParty)
             .OrderByDescending(x => x.DirectFault)
             .ThenByDescending(x => x.ProbablyCausedBy)
@@ -87,15 +89,15 @@ public sealed class DriverClassificationService
         }
     }
 
-    private StackDriverEvidence Build(string module, ParsedDebuggerOutput parsed)
+    private StackDriverEvidence Build(string module, ParsedDebuggerOutput parsed, bool allowLocalMetadata)
     {
         var normalized = NormalizeDriverName(module);
         var identity = Identity(normalized);
         var rule = MatchRule(identity);
-        var metadata = GetMetadata(normalized);
+        var metadata = allowLocalMetadata ? "Yerel dosya (çökme anındaki sürüm olmayabilir): " + GetMetadata(normalized) : "Yerel sürücü envanteri kullanılmadı.";
         var isMicrosoft = metadata.Contains("Microsoft Corporation", StringComparison.OrdinalIgnoreCase) || IsFramework(identity);
         var probable = SameModule(normalized, ExtractProbablyCausedBy(parsed.ProbablyCausedBy));
-        var direct = SameModule(normalized, parsed.FaultingModule);
+        var direct = parsed.FaultEvidenceSource == FaultEvidenceSource.ExceptionAddressModuleRange && SameModule(normalized, parsed.FaultingModule);
         var image = SameModule(normalized, parsed.ImageName);
         var namedModule = SameModule(normalized, parsed.ModuleName);
         var occurrences = parsed.StackModuleOccurrences

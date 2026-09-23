@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.0 - 2026-09-23
+
+- Karşılaştırmalı dump analizi; doğrulanmış çökme adresi ve kanıt kaynağı ayrımı.
+- Zayıf kanıt tekrarı için puan sınırı ve kanıta bağlı müdahale önerileri.
+- Haricî vaka yalıtımı, EVTX ve JSON sürücü envanteri ekleme.
+- Süreç ağacı iptali ve kesilemeyen onarımları bekleme politikası.
+- Update/geri yükleme doğrulaması, CHKDSK birim seçimi, ağ yedeği ve TEMP önizlemesi.
+- Eksik olay/ölçüm/DISM verisinin normal sonuçtan ayrılması.
+- WPF bağımsız çekirdek, küçük pencere düzeni, 44 otomatik test.
+- Yenilenen README ve teknik güvenlik notları.
+
+Detaylar: [v1.4.0 sürüm notları](docs/releases/v1.4.0.md).
+
 ## 1.3.0 - 2026-07-16
 
 ### Added

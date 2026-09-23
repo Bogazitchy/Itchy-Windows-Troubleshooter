@@ -10,14 +10,14 @@ namespace ItchyWindowsTroubleshooter.Services;
 
 public sealed class SystemAnalysisService
 {
-    private readonly CommandRunner _runner;
+    private readonly ICommandRunner _runner;
     private readonly Func<string, Task> _log;
     private readonly SystemInventoryService _inventory;
     private readonly ResourceAnalysisService _resources;
     private readonly AdvancedDumpAnalysisService _dumpAnalysis;
     private readonly SystemHealthAnalysisService _health;
 
-    public SystemAnalysisService(CommandRunner runner, Func<string, Task> log)
+    public SystemAnalysisService(ICommandRunner runner, Func<string, Task> log)
     {
         _runner = runner;
         _log = log;
@@ -42,17 +42,17 @@ public sealed class SystemAnalysisService
         return _inventory.GetTemperaturesAsync(cancellationToken);
     }
 
-    public async Task<GeneralScanResult> RunGeneralScanAsync(CancellationToken cancellationToken)
+    public async Task<GeneralScanResult> RunGeneralScanAsync(CancellationToken cancellationToken, bool quick = false)
     {
         await _log("Genel tarama: olay kayitlari, guvenilirlik gecmisi, kaynak kullanimi, aygitlar ve suruculer birlikte inceleniyor.");
 
-        var eventsTask = GetImportantEventCollectionAsync(30, cancellationToken);
-        var reliabilityTask = GetReliabilityCollectionAsync(30, cancellationToken);
+        var eventsTask = GetImportantEventCollectionAsync(quick ? 7 : 30, cancellationToken);
+        var reliabilityTask = GetReliabilityCollectionAsync(quick ? 7 : 30, cancellationToken);
         var problemDevicesTask = GetProblemDeviceScanAsync(cancellationToken);
         var systemDetailsTask = _inventory.GetSystemDetailsAsync(cancellationToken);
         var driversTask = _inventory.GetDriverDetailsAsync(cancellationToken);
         var resourcesTask = _resources.ScanAsync(cancellationToken);
-        var healthTask = _health.ScanAsync(cancellationToken);
+        var healthTask = quick ? Task.FromResult(new SystemHealthScanResult([], [new("Derin sağlık denetimi", "Atlandi", 0, "Hızlı taramada DISM ve derin sağlık denetimi çalıştırılmaz.")])) : _health.ScanAsync(cancellationToken);
 
         await Task.WhenAll(
             eventsTask,
@@ -73,7 +73,7 @@ public sealed class SystemAnalysisService
         var drivers = await driversTask;
         var resourceResult = await resourcesTask;
         var healthResult = await healthTask;
-        var blueScreenResult = await AnalyzeBlueScreensAsync(events, cancellationToken);
+        var blueScreenResult = quick ? new BlueScreenScanResult("Hızlı taramada dump analizi yapılmadı.", [], []) : await AnalyzeBlueScreensAsync(events, cancellationToken);
         var blueScreens = blueScreenResult.Signals;
         var dumpAnalyses = blueScreenResult.DumpAnalyses;
 
@@ -88,15 +88,18 @@ public sealed class SystemAnalysisService
             blueScreens,
             dumpAnalyses);
         var findings = BuildFindings(events, reliability, blueScreens, dumpAnalyses, problemDevices, healthResult.Checks);
+        if (quick) coverage = coverage.Select(x => x.Source == "Mavi ekran dump kaynaklari"
+            ? new ScanCoverageItem(x.Source, "Atlandi", 0, "Hızlı taramada dump analizi çalıştırılmadı.") : x).ToList();
         AddDiskSpaceFinding(findings);
         AddResourceFindings(findings, resourceResult);
         AddInventoryFindings(findings, systemDetails);
 
         if (findings.Count == 0)
         {
+            var complete = coverage.All(x => x.Status == "Tamamlandi");
             findings.Add(new Finding(
-                Severity.Success,
-                "Belirgin kritik bulgu bulunmadi.",
+                complete ? Severity.Success : Severity.Info,
+                complete ? "Belirgin kritik bulgu bulunmadı." : "Okunan veride kritik bulgu yok; tarama kapsamı eksik.",
                 "Okunan kayitlarda acil bir mavi ekran, donanim veya disk sorunu sinyali gorunmuyor.",
                 "Event Viewer, Reliability Monitor, kaynak kullanimi, dump dosyalari, diskler, aygitlar ve suruculer tarandi.",
                 "Sorun devam ediyorsa hatanin oldugu saat araliginda tekrar tarama yapin veya teknik detaylari raporlayin.")
@@ -157,10 +160,12 @@ public sealed class SystemAnalysisService
 
     public async Task<BlueScreenScanResult> AnalyzeSelectedDumpsAsync(
         IReadOnlyList<string> dumpPaths,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DumpAnalysisContext? context = null)
     {
-        var events = await GetImportantEventsAsync(30, cancellationToken);
-        return await _dumpAnalysis.AnalyzeAsync(dumpPaths, events, cancellationToken);
+        context ??= DumpAnalysisContext.External;
+        var events = context.AllowLocalData ? await GetImportantEventsAsync(30, cancellationToken) : context.CaseEvents;
+        return await _dumpAnalysis.AnalyzeAsync(dumpPaths, events, cancellationToken, context);
     }
 
     private async Task<BlueScreenScanResult> AnalyzeBlueScreensAsync(
@@ -169,7 +174,7 @@ public sealed class SystemAnalysisService
     {
         await _log("Mavi ekran derin analizi: dump butunlugu, WinDbg sembolleri, stop code, stack, surucu ve olay korelasyonu inceleniyor.");
         var discovery = DiscoverDumpFiles();
-        var result = await _dumpAnalysis.AnalyzeAsync(discovery.Paths, events, cancellationToken);
+        var result = await _dumpAnalysis.AnalyzeAsync(discovery.Paths, events, cancellationToken, DumpAnalysisContext.Local);
         return result with { Signals = discovery.Signals.Concat(result.Signals).ToList() };
     }
 
@@ -267,64 +272,11 @@ public sealed class SystemAnalysisService
 
     private async Task<EventCollectionResult> GetImportantEventCollectionAsync(int days, CancellationToken cancellationToken)
     {
-        await _log($"Event Viewer taraniyor: son {days} gunun kritik/hata kayitlari ve servis/disk/update sinyalleri.");
-        var script = """
-            $start = (Get-Date).AddDays(-{DAYS})
-            $events = @()
-            try { $events += Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=$start; Level=1,2} -MaxEvents 350 -ErrorAction Stop } catch {}
-            @(
-              @{Provider='disk'; Id=@(7,11,15,51,129,153,157)},
-              @{Provider='Microsoft-Windows-Ntfs'; Id=@(55,98,140)},
-              @{Provider='storahci'; Id=@(129,153)},
-              @{Provider='stornvme'; Id=@(11,129,153)},
-              @{Provider='storport'; Id=@(129,153)},
-              @{Provider='iaStorA'; Id=@(129,153)},
-              @{Provider='iaStorAC'; Id=@(129,153)},
-              @{Provider='volmgr'; Id=@(45,46,49,161,162)},
-              @{Provider='partmgr'; Id=@(58)},
-              @{Provider='Microsoft-Windows-WHEA-Logger'; Id=@(18,19,20,47)},
-              @{Provider='Display'; Id=@(4101)},
-              @{Provider='Microsoft-Windows-Kernel-Power'; Id=@(41)},
-              @{Provider='Microsoft-Windows-WER-SystemErrorReporting'; Id=@(1001)},
-              @{Provider='Microsoft-Windows-Kernel-PnP'; Id=@(219,411,442)},
-              @{Provider='Microsoft-Windows-DriverFrameworks-UserMode'; Id=@(10110,10111)},
-              @{Provider='Microsoft-Windows-MemoryDiagnostics-Results'; Id=@(1101,1201)},
-              @{Provider='Microsoft-Windows-Kernel-Processor-Power'; Id=@(35,37,55)},
-              @{Provider='Microsoft-Windows-UserPnp'; Id=@(20001,20003)},
-              @{Provider='Service Control Manager'; Id=@(7000,7001,7009,7023,7026,7031,7034,7043)}
-            ) | ForEach-Object {
-              try { $events += Get-WinEvent -FilterHashtable @{LogName='System'; StartTime=$start; ProviderName=$_.Provider; Id=$_.Id; Level=1,2,3} -MaxEvents 180 -ErrorAction Stop } catch {}
-            }
-            try { $events += Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=$start; Level=1,2} -MaxEvents 350 -ErrorAction Stop } catch {}
-            try { $events += Get-WinEvent -FilterHashtable @{LogName='Setup'; StartTime=$start; Level=1,2,3} -MaxEvents 180 -ErrorAction Stop } catch {}
-            @(
-              'Microsoft-Windows-DeviceSetupManager/Admin',
-              'Microsoft-Windows-DriverFrameworks-UserMode/Operational',
-              'Microsoft-Windows-WindowsUpdateClient/Operational',
-              'Microsoft-Windows-Diagnostics-Performance/Operational',
-              'Microsoft-Windows-CodeIntegrity/Operational'
-            ) | ForEach-Object {
-              try { $events += Get-WinEvent -FilterHashtable @{LogName=$_; StartTime=$start; Level=1,2,3} -MaxEvents 180 -ErrorAction Stop } catch {}
-            }
-            try { $events += Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Windows Defender/Operational'; StartTime=$start; Id=1116,1117,1118,1119,5001,5007} -MaxEvents 120 -ErrorAction Stop } catch {}
-            $events |
-              Where-Object { $_ -ne $null } |
-              Group-Object {$_.LogName + '|' + $_.RecordId} |
-              ForEach-Object { $_.Group[0] } |
-              Sort-Object TimeCreated -Descending |
-              Select-Object -First 1200 @{N='TimeCreated';E={$_.TimeCreated.ToString('o')}},LogName,ProviderName,Id,LevelDisplayName,@{N='Message';E={$m=$_.Message; if ([string]::IsNullOrWhiteSpace($m)) { '' } else { $m=$m -replace '\s+',' '; if ($m.Length -gt 1200) { $m.Substring(0,1200) } else { $m } }}} |
-              ConvertTo-Json -Depth 3 -Compress
-            """.Replace("{DAYS}", days.ToString());
-
-        var result = await _runner.RunPowerShellAsync(script, cancellationToken, false, "Event Viewer kayitlari okunuyor");
-        var events = ParseEvents(result.Output);
-        return new EventCollectionResult(
-            events,
-            [new ScanCoverageItem(
-                "Event Viewer",
-                !result.Success ? "Erisilemedi" : events.Count >= 1200 ? "Kismi" : "Tamamlandi",
-                events.Count,
-                !result.Success ? "Event Viewer sorgusu tamamlanamadi." : events.Count >= 1200 ? "1200 kayit sinirina ulasildi; daha eski kayitlar rapora alinmamis olabilir." : "Kritik, hata ve hedefli uyari kanallari okundu.")]);
+        await _log($"Event Viewer: son {days} günün olayları okunuyor.");
+        var collection = await new EventCollectionService(_runner).ReadAsync(days, cancellationToken);
+        foreach (var item in collection.Coverage.Where(x => x.Status != "Tamamlandi"))
+            await _log($"Olay sorgusu kapsamı: {item.Source}; {item.Status}; {item.Detail}");
+        return collection;
     }
 
     public async Task<IReadOnlyList<ReliabilityRecordItem>> GetReliabilityRecordsAsync(int days, CancellationToken cancellationToken)
@@ -780,7 +732,7 @@ public sealed class SystemAnalysisService
         builder.AppendLine();
         builder.AppendLine(primary.IsRootCauseCandidate ? "EN GUCLU KOK NEDEN ADAYI" : "EN GUCLU BULGU");
         builder.AppendLine($"Bilesen: {primary.Component}");
-        builder.AppendLine($"Guven: %{primary.ConfidenceScore} ({primary.Confidence}) | Rol: {primary.Role}");
+        builder.AppendLine($"Kanıt puanı: {primary.ConfidenceScore}/100 ({primary.Confidence}) | Bağımsız kaynak: {primary.IndependentSourceCount} | Rol: {primary.Role}");
         builder.AppendLine($"Neden: {primary.Cause}");
         builder.AppendLine($"Mavi ekran iliskisi: {primary.CrashRelation}");
         builder.AppendLine($"Kanit gucu: {primary.OccurrenceCount} tekrar, {primary.IndependentSourceCount} bagimsiz kaynak, {primary.RecencyText.ToLowerInvariant()}.");
@@ -797,7 +749,7 @@ public sealed class SystemAnalysisService
             for (var index = 0; index < otherCandidates.Count; index++)
             {
                 var item = otherCandidates[index];
-                builder.AppendLine($"{index + 1}. {item.Component}: %{item.ConfidenceScore} guven, {item.Role}, {item.OccurrenceCount} tekrar. {FirstSentence(item.Recommendation)}");
+                builder.AppendLine($"{index + 1}. {item.Component}: {item.ConfidenceScore}/100 kanıt puanı, {item.IndependentSourceCount} bağımsız kaynak, {item.Role}, {item.OccurrenceCount} tekrar. {FirstSentence(item.Recommendation)}");
             }
         }
 
@@ -848,7 +800,7 @@ public sealed class SystemAnalysisService
     {
         await _log("Aygit Yoneticisi hata kodlari kontrol ediliyor.");
         var script = """
-            Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue |
+            Get-CimInstance Win32_PnPEntity -ErrorAction Stop |
               Where-Object {
                 $_.ConfigManagerErrorCode -ne $null -and
                 $_.ConfigManagerErrorCode -ne 0 -and
@@ -981,18 +933,19 @@ public sealed class SystemAnalysisService
             drivers.Count > 0 ? "Tamamlandi" : "Kismi",
             drivers.Count,
             drivers.Count > 0 ? "BIOS, GPU, chipset ve depolama suruculeri sorgulandi." : "Surucu envanteri bos; WMI/CIM erisimi sinirli olabilir."));
-        var resourceUnavailable = resources.Metrics.Any(x => x.Value.Equals("Okunamadi", StringComparison.OrdinalIgnoreCase));
+        var resourceUnavailable = resources.Metrics.All(x => x.Availability == DataAvailability.Inaccessible);
+        var resourcePartial = resources.Metrics.Any(x => x.Availability != DataAvailability.Read);
         coverage.Add(new ScanCoverageItem(
             "Kaynak kullanimi orneklemi",
-            resourceUnavailable ? "Erisilemedi" : "Tamamlandi",
+            resourceUnavailable ? "Erisilemedi" : resourcePartial ? "Kismi" : "Tamamlandi",
             resources.Metrics.Count,
-            resourceUnavailable ? "Performans sayaclari okunamadi." : "CPU, RAM, disk, ag ve yogun islemler coklu orneklemlendi."));
+            resourceUnavailable ? "Performans sayaclari okunamadi." : resourcePartial ? "Bazı ölçümler eksik; kaynak tablosunda örnek sayıları ve erişim durumu gösterilir." : "CPU, RAM, disk, ag ve yogun islemler coklu orneklemlendi."));
 
         var dumpAccessFailure = blueScreens.Any(x => x.Title.Contains("erisim yok", StringComparison.OrdinalIgnoreCase) || x.Title.Contains("okunamadi", StringComparison.OrdinalIgnoreCase));
         var dumpCount = Math.Max(blueScreens.Count(IsDumpEvidence), dumpAnalyses.Count);
         coverage.Add(new ScanCoverageItem(
             "Mavi ekran dump kaynaklari",
-            dumpAccessFailure ? "Kismi" : "Tamamlandi",
+            dumpAccessFailure || dumpAnalyses.Any(x => !x.AnalysisStatus.StartsWith("Tamamlandi", StringComparison.Ordinal) || x.SymbolsIncomplete) ? "Kismi" : "Tamamlandi",
             dumpCount,
             dumpAccessFailure
                 ? "Dump klasorlerinden en az biri okunamadi; yonetici izniyle tekrar tarayin."
@@ -1786,9 +1739,6 @@ public sealed class SystemAnalysisService
 
     private sealed record DumpDiscovery(IReadOnlyList<string> Paths, IReadOnlyList<BlueScreenRecord> Signals);
 
-    private sealed record EventCollectionResult(
-        IReadOnlyList<EventRecordItem> Events,
-        IReadOnlyList<ScanCoverageItem> Coverage);
 
     private sealed record ReliabilityCollectionResult(
         IReadOnlyList<ReliabilityRecordItem> Records,

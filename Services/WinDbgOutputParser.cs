@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.RegularExpressions;
+using ItchyWindowsTroubleshooter.Models;
 
 namespace ItchyWindowsTroubleshooter.Services;
 
@@ -38,7 +39,13 @@ public sealed record ParsedDebuggerOutput(
     IReadOnlyDictionary<string, int> StackModuleOccurrences,
     IReadOnlyList<string> MemoryCorruptionIndicators,
     IReadOnlyList<string> InvalidPointerIndicators,
-    string PointerAnalysis);
+    string PointerAnalysis)
+{
+    public FaultEvidenceSource FaultEvidenceSource { get; init; }
+    public string DisassemblyContext { get; init; } = "";
+    public DateTime? CrashTime { get; init; }
+    public bool SymbolsIncomplete { get; init; }
+}
 
 public sealed class WinDbgOutputParser
 {
@@ -79,15 +86,16 @@ public sealed class WinDbgOutputParser
             access = access with { Address = !string.IsNullOrWhiteSpace(readAddress) ? readAddress : !string.IsNullOrWhiteSpace(writeAddress) ? writeAddress : BugCheckKnowledgeBase.InferAttemptedAddress(bugCode, args) };
         }
 
-        var faulting = ParseFaultingInstruction(output);
-        var faultingAddress = !string.IsNullOrWhiteSpace(faulting.Address)
-            ? faulting.Address
-            : BugCheckKnowledgeBase.InferFaultingAddress(bugCode, args);
+        var faultingAddress = FirstNonEmpty(
+            AddressFromField(Value(output, "ExceptionAddress")),
+            BugCheckKnowledgeBase.InferFaultingAddress(bugCode, args));
+        var registers = ParseRegisters(output, faultingAddress);
+        if (string.IsNullOrWhiteSpace(faultingAddress) && registers.TryGetValue("RIP", out var rip)) faultingAddress = rip;
+        var faulting = ParseFaultingInstruction(output, faultingAddress);
         var symbol = Value(output, "SYMBOL_NAME");
         var module = Value(output, "MODULE_NAME");
-        var faultingModule = FirstNonEmpty(faulting.Module, ModuleFromSymbol(symbol), NormalizeModule(module));
-        var faultingSymbol = FirstNonEmpty(faulting.Symbol, symbol);
-        var registers = ParseRegisters(output);
+        var faultingModule = ModuleAtAddress(output, faultingAddress);
+        var faultingSymbol = faulting.Symbol;
         var pointer = AnalyzePointer(faulting.Instruction, registers);
         var invalidPointers = BuildInvalidPointerIndicators(access.Address, pointer);
         var memoryIndicators = BuildMemoryIndicators(output, bugCode, exceptionCode, invalidPointers);
@@ -127,7 +135,14 @@ public sealed class WinDbgOutputParser
             ParseStackOccurrences(output),
             memoryIndicators,
             invalidPointers,
-            pointer.Text);
+            pointer.Text)
+        {
+            FaultEvidenceSource = string.IsNullOrWhiteSpace(faultingModule)
+                ? FaultEvidenceSource.Unknown : FaultEvidenceSource.ExceptionAddressModuleRange,
+            DisassemblyContext = string.Join(Environment.NewLine, output.Split('\n').Where(x => !string.IsNullOrEmpty(ParseInstructionLine(x.TrimEnd('\r')).Instruction))),
+            CrashTime = ParseCrashTime(output),
+            SymbolsIncomplete = Regex.IsMatch(output, "symbols are wrong|symbol file could not be found|unable to load image|wrong_symbols", RegexOptions.IgnoreCase)
+        };
     }
 
     private static List<string> ParseArguments(string output)
@@ -136,9 +151,9 @@ public sealed class WinDbgOutputParser
         for (var i = 1; i <= 4; i++)
         {
             var match = Regex.Match(output, $@"(?im)^\s*(?:Arg{i}|BUGCHECK_P{i})\s*:\s*([^\r\n]+)");
-            if (match.Success) result.Add(ExtractAddressToken(match.Groups[1].Value));
+            result.Add(match.Success ? ExtractAddressToken(match.Groups[1].Value) : "");
         }
-        return result;
+        return result.All(string.IsNullOrEmpty) ? [] : result;
     }
 
     private static AccessData ParseExceptionAccess(string output, string readAddress, string writeAddress)
@@ -152,18 +167,21 @@ public sealed class WinDbgOutputParser
         return new AccessData(type, NormalizeOptionalAddress(p1));
     }
 
-    private static FaultingData ParseFaultingInstruction(string output)
+    private static FaultingData ParseFaultingInstruction(string output, string targetAddress)
     {
+        if (!BugCheckKnowledgeBase.TryParseHex(targetAddress, out var target) || target == 0) return new("", "", "", "");
         var lines = output.Replace("\r", "").Split('\n');
         foreach (var marker in new[] { "ITCHY_CONTEXT_DISASSEMBLY", "FAULTING_IP", "ITCHY_DISASSEMBLY" })
         {
             for (var i = 0; i < lines.Length; i++)
             {
-                if (!lines[i].Contains(marker, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!lines[i].Trim().Equals(marker, StringComparison.OrdinalIgnoreCase) &&
+                    !lines[i].Trim().Equals(marker + ":", StringComparison.OrdinalIgnoreCase)) continue;
                 var pendingModule = "";
                 var pendingSymbol = "";
-                for (var j = i + 1; j < Math.Min(lines.Length, i + 12); j++)
+                for (var j = i + 1; j < Math.Min(lines.Length, i + 70); j++)
                 {
+                    if (lines[j].TrimStart().StartsWith("ITCHY_", StringComparison.Ordinal) || Regex.IsMatch(lines[j], @"^\s*[A-Z_]{3,}:")) break;
                     var symbolHeader = Regex.Match(lines[j], @"(?i)^\s*([a-z][a-z0-9_.-]*)(?:!([^\s:]+)|\+([^\s:]+)):?\s*$");
                     if (symbolHeader.Success)
                     {
@@ -174,7 +192,8 @@ public sealed class WinDbgOutputParser
                         continue;
                     }
                     var parsed = ParseInstructionLine(lines[j]);
-                    if (!string.IsNullOrWhiteSpace(parsed.Instruction))
+                    if (!string.IsNullOrWhiteSpace(parsed.Instruction) &&
+                        BugCheckKnowledgeBase.TryParseHex(parsed.Address, out var address) && address == target)
                     {
                         return parsed with
                         {
@@ -191,7 +210,7 @@ public sealed class WinDbgOutputParser
 
     private static FaultingData ParseInstructionLine(string line)
     {
-        var match = Regex.Match(line, @"(?i)^\s*([0-9a-f`]{8,16})\s+(?:(\w[\w.-]*)(?:!|\+)([^\s:]+):?\s+)?(?:[0-9a-f]{2,32}\s+)+(.+)$");
+        var match = Regex.Match(line, @"(?i)^\s*([0-9a-f`]{8,17})\s+(?:(\w[\w.-]*)(?:!|\+)([^\s:]+):?\s+)?(?:[0-9a-f]{2,32}\s+)+(.+)$");
         if (!match.Success) return new FaultingData("", "", "", "");
         var instruction = match.Groups[4].Value.Trim();
         if (instruction.StartsWith("***", StringComparison.Ordinal) || instruction.Contains("Unable to", StringComparison.OrdinalIgnoreCase)) return new FaultingData("", "", "", "");
@@ -202,12 +221,21 @@ public sealed class WinDbgOutputParser
             instruction);
     }
 
-    private static IReadOnlyDictionary<string, string> ParseRegisters(string output)
+    private static IReadOnlyDictionary<string, string> ParseRegisters(string output, string faultAddress)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        // A register bank must belong to the exception IP, never KeBugCheckEx or a failed .cxr.
+        var blocks = Regex.Matches(output, @"(?im)(?:^[ \t]*(?:(?:r(?:ax|bx|cx|dx|si|di|sp|bp|ip|[89]|1[0-5])|[a-z]{2,6})=[0-9a-f`]+[ \t]*)+\r?\n?)+");
+        var block = blocks.Cast<Match>().LastOrDefault(x =>
+        {
+            var ip = Regex.Match(x.Value, @"(?i)\brip=([0-9a-f`]+)");
+            return ip.Success && BugCheckKnowledgeBase.TryParseHex(ip.Groups[1].Value, out var value) &&
+                BugCheckKnowledgeBase.TryParseHex(faultAddress, out var expected) && value == expected;
+        });
+        if (block is null) return result;
         foreach (var name in RegisterNames)
         {
-            var matches = Regex.Matches(output, $@"(?i)(?<![a-z0-9]){name}=([0-9a-f`]+)");
+            var matches = Regex.Matches(block.Value, $@"(?i)(?<![a-z0-9]){name}=([0-9a-f`]+)");
             if (matches.Count > 0) result[name.ToUpperInvariant()] = BugCheckKnowledgeBase.NormalizeAddress(matches[^1].Groups[1].Value);
         }
         return result;
@@ -216,8 +244,9 @@ public sealed class WinDbgOutputParser
     private static PointerData AnalyzePointer(string instruction, IReadOnlyDictionary<string, string> registers)
     {
         if (string.IsNullOrWhiteSpace(instruction) || registers.Count == 0) return new PointerData("", "", "");
-        var operand = Regex.Match(instruction, @"(?i)\[\s*(r(?:ax|bx|cx|dx|si|di|sp|bp|8|9|10|11|12|13|14|15))(?:\s*([+-])\s*(?:0x)?([0-9a-f]+)h?)?[^\]]*\]");
-        if (!operand.Success) return new PointerData("", "", "");
+        var operand = Regex.Match(instruction, @"(?i)\[\s*(r(?:ax|bx|cx|dx|si|di|sp|bp|8|9|10|11|12|13|14|15))(?:\s*([+-])\s*(?:0x)?([0-9a-f]+)h?)?\s*\]");
+        if (!operand.Success || Regex.Matches(instruction, @"\[").Count != 1 || Regex.IsMatch(instruction, @"(?i)\b(?:lea|gs:|fs:)"))
+            return new PointerData("Adresleme ifadesi desteklenmiyor; etkin pointer hesaplanmadı.", "", "");
         var register = operand.Groups[1].Value.ToUpperInvariant();
         if (!registers.TryGetValue(register, out var value) || !BugCheckKnowledgeBase.TryParseHex(value, out var baseValue)) return new PointerData("", "", "");
         var effective = baseValue;
@@ -300,7 +329,7 @@ public sealed class WinDbgOutputParser
 
     private static string Value(string output, string key)
     {
-        var match = Regex.Match(output, $@"(?im)^\s*{Regex.Escape(key)}\s*:\s*([^\r\n]*)");
+        var match = Regex.Match(output, $@"(?im)^[ \t]*{Regex.Escape(key)}[ \t]*:[ \t]*([^\r\n]*)");
         return match.Success ? match.Groups[1].Value.Trim() : "";
     }
 
@@ -321,7 +350,7 @@ public sealed class WinDbgOutputParser
 
     private static string ExtractAddressToken(string value)
     {
-        var match = Regex.Match(value ?? "", @"(?i)(?:0x)?[0-9a-f`]{1,16}");
+        var match = Regex.Match(value ?? "", @"(?i)^\s*(?:0x)?[0-9a-f`]{1,17}(?=\s|,|$)");
         return match.Success ? match.Value : "";
     }
 
@@ -338,6 +367,32 @@ public sealed class WinDbgOutputParser
     }
 
     private static string FirstNonEmpty(params string[] values) => values.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? "";
+
+    private static string ModuleAtAddress(string output, string address)
+    {
+        if (!BugCheckKnowledgeBase.TryParseHex(address, out var ip) || ip == 0) return "";
+        foreach (Match m in Regex.Matches(output, @"(?im)^\s*([0-9a-f`]{8,17})\s+([0-9a-f`]{8,17})\s+([a-z][\w.-]*)(?:\s|$)"))
+        {
+            if (BugCheckKnowledgeBase.TryParseHex(m.Groups[1].Value, out var start) &&
+                BugCheckKnowledgeBase.TryParseHex(m.Groups[2].Value, out var end) && start <= ip && ip < end)
+                return m.Groups[3].Value;
+        }
+        return "";
+    }
+
+    public static DateTime? ParseCrashTime(string output)
+    {
+        var match = Regex.Match(output, @"(?im)^Debug session time:\s*(.+?)\s*\(UTC\s*([+-])\s*(\d+):(\d+)\)");
+        if (!match.Success) return null;
+        var timestamp = match.Groups[1].Value.Trim();
+        if (!DateTime.TryParseExact(timestamp,
+                ["ddd MMM d HH:mm:ss.FFFFFFF yyyy", "ddd MMM d HH:mm:ss yyyy"],
+                CultureInfo.InvariantCulture, DateTimeStyles.AllowWhiteSpaces, out var date)) return null;
+        var offset = new TimeSpan(int.Parse(match.Groups[3].Value), int.Parse(match.Groups[4].Value), 0);
+        if (match.Groups[2].Value == "-") offset = -offset;
+        if (offset.Duration() > TimeSpan.FromHours(14)) return null;
+        return new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Unspecified), offset).LocalDateTime;
+    }
 
     private sealed record AccessData(string Type, string Address);
     private sealed record FaultingData(string Address, string Module, string Symbol, string Instruction);

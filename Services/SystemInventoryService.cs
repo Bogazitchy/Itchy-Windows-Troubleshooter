@@ -6,11 +6,11 @@ namespace ItchyWindowsTroubleshooter.Services;
 
 public sealed class SystemInventoryService
 {
-    private readonly CommandRunner _runner;
+    private readonly ICommandRunner _runner;
     private readonly Func<string, Task> _log;
     private readonly HardwareSensorService _sensors = new();
 
-    public SystemInventoryService(CommandRunner runner, Func<string, Task> log)
+    public SystemInventoryService(ICommandRunner runner, Func<string, Task> log)
     {
         _runner = runner;
         _log = log;

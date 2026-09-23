@@ -5,10 +5,10 @@ namespace ItchyWindowsTroubleshooter.Services;
 
 public sealed class ResourceAnalysisService
 {
-    private readonly CommandRunner _runner;
+    private readonly ICommandRunner _runner;
     private readonly Func<string, Task> _log;
 
-    public ResourceAnalysisService(CommandRunner runner, Func<string, Task> log)
+    public ResourceAnalysisService(ICommandRunner runner, Func<string, Task> log)
     {
         _runner = runner;
         _log = log;
@@ -26,7 +26,7 @@ public sealed class ResourceAnalysisService
             1..5 | ForEach-Object {
               $cpu = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Measure-Object LoadPercentage -Average
               $os = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
-              $memory = if ($os.TotalVisibleMemorySize -gt 0) { 100 * (1 - ($os.FreePhysicalMemory / $os.TotalVisibleMemorySize)) } else { 0 }
+              $memory = if ($os.TotalVisibleMemorySize -gt 0) { 100 * (1 - ($os.FreePhysicalMemory / $os.TotalVisibleMemorySize)) } else { $null }
               $disk = Get-CimInstance Win32_PerfFormattedData_PerfDisk_PhysicalDisk -ErrorAction SilentlyContinue |
                 Where-Object { $_.Name -eq '_Total' } | Select-Object -First 1
               $network = Get-CimInstance Win32_PerfFormattedData_Tcpip_NetworkInterface -ErrorAction SilentlyContinue |
@@ -36,15 +36,24 @@ public sealed class ResourceAnalysisService
               $processSamples += $lastProcesses | Select-Object Name,@{N='Cpu';E={[double]$_.PercentProcessorTime}}
 
               $samples += [pscustomobject]@{
-                Cpu=[double]$cpu.Average
-                Memory=[double]$memory
-                Disk=[double]$disk.PercentDiskTime
-                Queue=[double]$disk.CurrentDiskQueueLength
-                Network=[double]$network.Sum
+                Cpu=$(if ($null -ne $cpu.Average) { [double]$cpu.Average } else { $null })
+                Memory=$(if ($null -ne $memory) { [double]$memory } else { $null })
+                Disk=$(if ($null -ne $disk.PercentDiskTime) { [double]$disk.PercentDiskTime } else { $null })
+                Queue=$(if ($null -ne $disk.CurrentDiskQueueLength) { [double]$disk.CurrentDiskQueueLength } else { $null })
+                Network=$(if ($network.Count -gt 0 -and $null -ne $network.Sum) { [double]$network.Sum } else { $null })
               }
               if ($_ -lt 5) { Start-Sleep -Milliseconds 900 }
             }
 
+            function Aggregate($property, $peak = $false, $scale = 1) {
+              $values = @($samples | Where-Object { $null -ne $_.$property })
+              if ($values.Count -eq 0) { return $null }
+              $measure = $values | Measure-Object -Property $property -Average -Maximum
+              $number = if ($peak) { $measure.Maximum } else { $measure.Average }
+              [math]::Round($number * $scale, 2)
+            }
+            $counts = @{}
+            'Cpu','Memory','Disk','Queue','Network' | ForEach-Object { $key=$_; $counts[$key]=@($samples | Where-Object { $null -ne $_.$key }).Count }
             $topCpu = $processSamples | Group-Object Name | ForEach-Object {
               [pscustomobject]@{
                 Name=$_.Name
@@ -53,13 +62,14 @@ public sealed class ResourceAnalysisService
             } | Sort-Object Percent -Descending | Select-Object -First 1
             $topMemory = Get-Process -ErrorAction SilentlyContinue | Sort-Object WorkingSet64 -Descending | Select-Object -First 1
             [pscustomobject]@{
-              CpuAverage=[math]::Round(($samples | Measure-Object Cpu -Average).Average,1)
-              CpuPeak=[math]::Round(($samples | Measure-Object Cpu -Maximum).Maximum,1)
-              MemoryAverage=[math]::Round(($samples | Measure-Object Memory -Average).Average,1)
-              DiskAverage=[math]::Round([math]::Min(100,($samples | Measure-Object Disk -Average).Average),1)
-              DiskPeak=[math]::Round([math]::Min(100,($samples | Measure-Object Disk -Maximum).Maximum),1)
-              DiskQueuePeak=[math]::Round(($samples | Measure-Object Queue -Maximum).Maximum,2)
-              NetworkMbps=[math]::Round((($samples | Measure-Object Network -Average).Average * 8 / 1MB),2)
+              SampleCounts=$counts
+              CpuAverage=$(Aggregate 'Cpu')
+              CpuPeak=$(Aggregate 'Cpu' $true)
+              MemoryAverage=$(Aggregate 'Memory')
+              DiskAverage=$(Aggregate 'Disk')
+              DiskPeak=$(Aggregate 'Disk' $true)
+              DiskQueuePeak=$(Aggregate 'Queue' $true)
+              NetworkMbps=$(Aggregate 'Network' $false (8/1MB))
               TopCpuProcess=[string]$topCpu.Name
               TopCpuPercent=[double]$topCpu.Percent
               TopMemoryProcess=[string]$topMemory.ProcessName
@@ -73,10 +83,10 @@ public sealed class ResourceAnalysisService
             false,
             "Kaynak kullanimi ornekleniyor");
 
-        return Parse(result.Output);
+        return result.Success ? Parse(result.Output) : Empty("Kaynak sorgusu tamamlanamadı");
     }
 
-    private static ResourceScanResult Parse(string output)
+    public static ResourceScanResult Parse(string output)
     {
         var candidate = output
             .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
@@ -115,6 +125,20 @@ public sealed class ResourceAnalysisService
                 new("En cok RAM kullanan", string.IsNullOrWhiteSpace(topMemory) ? "Okunamadi" : $"{topMemory} ({topMemoryMb:N1} MB)", "Bilgi", "Tarama sonundaki islem orneklemi.")
             };
 
+            var keys = new[] { "Cpu", "Memory", "Disk", "Queue", "Network", "Cpu", "Memory" };
+            for (var i = 0; i < metrics.Count; i++)
+            {
+                var count = root.TryGetProperty("SampleCounts", out var counts) && counts.TryGetProperty(keys[i], out var c) && c.TryGetInt32(out var n) ? n : 0;
+                var missing = count == 0 || metrics[i].Value.Contains("NaN") || metrics[i].Value == "Okunamadi";
+                metrics[i] = metrics[i] with
+                {
+                    Value = missing ? "Ölçülemedi" : metrics[i].Value,
+                    Status = missing ? "Erişilemedi" : count < 5 ? "Kısmi" : metrics[i].Status,
+                    Availability = missing ? DataAvailability.Inaccessible : count < 5 ? DataAvailability.Partial : DataAvailability.Read,
+                    Detail = metrics[i].Detail + $" Geçerli örnek: {count}/5."
+                };
+            }
+
             return new ResourceScanResult(
                 metrics,
                 cpuAverage,
@@ -137,23 +161,23 @@ public sealed class ResourceAnalysisService
     private static ResourceScanResult Empty(string reason)
     {
         return new ResourceScanResult(
-            [new ResourceMetricItem("Kaynak analizi", "Okunamadi", "Bilgi", reason)],
-            0, 0, 0, 0, 0, 0, "", 0, "", 0);
+            [new ResourceMetricItem("Kaynak analizi", "Ölçülemedi", "Erişilemedi", reason) { Availability = DataAvailability.Inaccessible }],
+            double.NaN, double.NaN, double.NaN, double.NaN, double.NaN, double.NaN, "", double.NaN, "", double.NaN);
     }
 
     private static string LoadStatus(double value, double warning, double critical)
     {
-        return value >= critical ? "Kritik" : value >= warning ? "Yuksek" : "Normal";
+        return double.IsNaN(value) ? "Erişilemedi" : value >= critical ? "Kritik" : value >= warning ? "Yuksek" : "Normal";
     }
 
     private static double ReadDouble(JsonElement element, string name)
     {
         if (!element.TryGetProperty(name, out var value))
         {
-            return 0;
+            return double.NaN;
         }
 
-        return value.TryGetDouble(out var number) ? number : 0;
+        return value.ValueKind == JsonValueKind.Number && value.TryGetDouble(out var number) ? number : double.NaN;
     }
 
     private static string ReadString(JsonElement element, string name)

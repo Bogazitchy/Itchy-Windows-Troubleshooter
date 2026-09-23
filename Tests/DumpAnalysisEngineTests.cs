@@ -33,6 +33,7 @@ public sealed class DumpAnalysisEngineTests
             STACK_TEXT:
             ffff9000`00000000 fffff805`12345678 : nvlddmkm+0xdee2a0
             STACK_COMMAND: .cxr; kb
+            fffff805`12000000 fffff805`13000000 nvlddmkm
             """);
 
         var evidence = _drivers.BuildEvidence(parsed);
@@ -123,10 +124,10 @@ public sealed class DumpAnalysisEngineTests
             new EventRecordItem(DateTime.Now, "System", "Microsoft-Windows-Kernel-Power", 41, "Critical", "Sistem beklenmedik sekilde kapandi.")
         };
 
-        var result = _correlation.Analyze([], events);
+        var result = _correlation.Analyze([CreateDump("neutral.dmp", "", "", "System")], events);
 
         Assert.Empty(result.Candidates);
-        Assert.Equal(CrossDumpAnalysisResult.Empty, result);
+        Assert.DoesNotContain(result.Candidates, x => x.Category == RootCauseCategory.Power);
     }
 
     private static DumpAnalysisItem CreateDump(string fileName, string code, string name, string process) => new(

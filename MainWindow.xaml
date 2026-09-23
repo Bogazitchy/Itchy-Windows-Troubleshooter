@@ -5,7 +5,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
-        Title="ITCHY Windows Troubleshooter" Height="860" Width="1320" MinHeight="740" MinWidth="1120"
+        Title="ITCHY Windows Troubleshooter" Height="860" Width="1320" MinHeight="440" MinWidth="800"
         Background="#0D1117" Foreground="#F0F6FC" WindowStartupLocation="CenterScreen"
         FontFamily="Segoe UI" FontSize="13">
     <Window.Resources>
@@ -25,12 +25,15 @@
         <SolidColorBrush x:Key="WarningBrush" Color="#D29922"/>
         <SolidColorBrush x:Key="SuccessBrush" Color="#3FB950"/>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <Style TargetType="Expander">
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+        </Style>
 
         <Style x:Key="CopyableText" TargetType="TextBlock">
             <Setter Property="ContextMenu">
                 <Setter.Value>
                     <ContextMenu>
-                        <MenuItem Header="Metni Kopyala" Command="{x:Static local:MainWindow.CopyTextCommand}"
+                        <MenuItem Header="Metni kopyala" Command="{x:Static local:MainWindow.CopyTextCommand}"
                                   CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"/>
                     </ContextMenu>
                 </Setter.Value>
@@ -286,9 +289,9 @@
             <Setter Property="ContextMenu">
                 <Setter.Value>
                     <ContextMenu>
-                        <MenuItem Header="Secili Satirlari Kopyala" Command="{x:Static local:MainWindow.CopySelectedRowsCommand}"
+                        <MenuItem Header="Seçili satırları kopyala" Command="{x:Static local:MainWindow.CopySelectedRowsCommand}"
                                   CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"/>
-                        <MenuItem Header="Tum Tabloyu Kopyala" Command="{x:Static local:MainWindow.CopyAllRowsCommand}"
+                        <MenuItem Header="Tüm tabloyu kopyala" Command="{x:Static local:MainWindow.CopyAllRowsCommand}"
                                   CommandTarget="{Binding PlacementTarget, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}"/>
                     </ContextMenu>
                 </Setter.Value>
@@ -458,12 +461,12 @@
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="270"/>
+            <ColumnDefinition Width="225"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <Border Grid.Column="0" Background="{StaticResource SidebarBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Padding="18">
-            <DockPanel LastChildFill="True">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"><DockPanel LastChildFill="False">
                 <StackPanel DockPanel.Dock="Top">
                     <Grid Margin="0,2,0,22">
                         <Grid.ColumnDefinitions>
@@ -475,7 +478,7 @@
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="4,0,0,0">
                             <TextBlock Text="ITCHY" FontSize="21" FontWeight="Black" Foreground="{StaticResource TextBrush}"/>
-                            <TextBlock Text="Windows Troubleshooter" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
+                            <TextBlock Text="Windows Troubleshooter" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" FontSize="12"/>
                         </StackPanel>
                     </Grid>
                     <Border Background="{StaticResource ElevatedBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="3,1,1,1" CornerRadius="7" Padding="13" Margin="0,0,0,18">
@@ -488,37 +491,29 @@
                     <Button Click="StartScan_Click" Style="{StaticResource PrimaryButton}" IsEnabled="{Binding IsIdle}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE768;" FontSize="15" Margin="0,0,8,0"/>
-                            <TextBlock Text="Taramayi Baslat"/>
+                            <TextBlock Text="Kapsamlı tarama"/>
                         </StackPanel>
                     </Button>
-                    <Button Click="Cancel_Click" Style="{StaticResource DangerButton}" IsEnabled="{Binding IsBusy}">
+                    <Button Content="Hızlı tarama" Tag="quick" Click="StartScan_Click" IsEnabled="{Binding IsIdle}"/>
+                    <Button Click="Cancel_Click" Style="{StaticResource DangerButton}" IsEnabled="{Binding CanCancel}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE711;" FontSize="14" Margin="0,0,8,0"/>
-                            <TextBlock Text="Taramayi Iptal Et"/>
+                            <TextBlock Text="{Binding CancelLabel}" TextWrapping="Wrap" MaxWidth="125"/>
                         </StackPanel>
                     </Button>
                     <Button Click="CreateReport_Click" IsEnabled="{Binding IsIdle}">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock FontFamily="Segoe Fluent Icons" Text="&#xE74E;" FontSize="14" Margin="0,0,8,0"/>
-                            <TextBlock Text="HTML Raporu Disa Aktar"/>
+                            <TextBlock Text="Raporu dışa aktar"/>
                         </StackPanel>
                     </Button>
                 </StackPanel>
-                <StackPanel DockPanel.Dock="Bottom">
-                    <Grid Margin="0,0,0,7">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="CANLI LOG" FontWeight="Bold" FontSize="11" Foreground="{StaticResource MutedBrush}" VerticalAlignment="Center"/>
-                        <Border Grid.Column="1" Background="#12371F" BorderBrush="#276B3B" BorderThickness="1" CornerRadius="8" Padding="7,1">
-                            <TextBlock Text="AKTIF" Foreground="#7EE787" FontSize="10" FontWeight="Bold"/>
-                        </Border>
-                    </Grid>
-                    <TextBox Text="{Binding LiveLog}" Height="250" IsReadOnly="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
-                             Background="{StaticResource InsetBrush}" Foreground="#C9D1D9" BorderBrush="{StaticResource BorderBrush}" FontFamily="Cascadia Mono, Consolas" FontSize="11.5"/>
-                </StackPanel>
-            </DockPanel>
+                <Expander DockPanel.Dock="Bottom" Header="İşlem ayrıntıları" IsExpanded="False" Margin="0,12,0,0">
+                    <TextBox Text="{Binding LiveLog}" Height="180" IsReadOnly="True" TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto" Background="{StaticResource InsetBrush}" Foreground="#C9D1D9"
+                             FontFamily="Consolas" FontSize="11"/>
+                </Expander>
+            </DockPanel></ScrollViewer>
         </Border>
 
         <Grid Grid.Column="1" Margin="18">
@@ -534,17 +529,21 @@
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
                 <StackPanel>
-                    <TextBlock Text="Teknik servis ariza teshis asistani" FontSize="26" FontWeight="Bold" Foreground="{StaticResource TextBrush}"/>
+                    <TextBlock Text="Teknik servis arıza teşhis asistanı" FontSize="21" FontWeight="Bold" Foreground="{StaticResource TextBrush}"/>
                     <TextBlock Text="{Binding HeaderSummary}" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                 </StackPanel>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="20,0,0,0">
                     <TextBlock Text="WINDOWS 10 / 11" Foreground="{StaticResource MutedBrush}" FontSize="10" FontWeight="Bold" HorizontalAlignment="Right" Margin="0,0,0,6"/>
                     <TextBlock Text="{Binding ScanStage}" Foreground="{StaticResource CyanBrush}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right" TextWrapping="Wrap" MaxWidth="280" Margin="0,0,0,6"/>
-                    <ProgressBar Width="220" Height="7" IsIndeterminate="{Binding IsBusy}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"/>
+                    <TextBlock Text="{Binding ElapsedText}" HorizontalAlignment="Right" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,5"/>
+                    <ProgressBar Width="180" Height="7" IsIndeterminate="{Binding IsBusy}" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}"/>
                 </StackPanel>
             </Grid>
 
             <UniformGrid Grid.Row="1" Columns="4" Margin="0,0,0,10">
+                <UniformGrid.Style><Style TargetType="UniformGrid"><Style.Triggers>
+                    <DataTrigger Binding="{Binding IsCompactLayout}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                </Style.Triggers></Style></UniformGrid.Style>
                 <Border Style="{StaticResource MetricCard}" BorderBrush="{StaticResource DangerBrush}">
                     <StackPanel>
                         <TextBlock Text="{Binding CriticalCount}" FontSize="25" FontWeight="Bold" Foreground="{StaticResource DangerBrush}"/>
@@ -554,7 +553,7 @@
                 <Border Style="{StaticResource MetricCard}" BorderBrush="{StaticResource WarningBrush}">
                     <StackPanel>
                         <TextBlock Text="{Binding WarningCount}" FontSize="25" FontWeight="Bold" Foreground="{StaticResource WarningBrush}"/>
-                        <TextBlock Text="Uyari" Foreground="{StaticResource MutedBrush}"/>
+                        <TextBlock Text="Uyarı" Foreground="{StaticResource MutedBrush}"/>
                     </StackPanel>
                 </Border>
                 <Border Style="{StaticResource MetricCard}" BorderBrush="{StaticResource AccentBrush}">
@@ -606,7 +605,7 @@
                                                     <DockPanel>
                                                         <Border DockPanel.Dock="Right" Background="#21262D" BorderBrush="{Binding ConfidenceBrush}" BorderThickness="1" CornerRadius="4" Padding="8,3" Margin="10,0,0,0">
                                                             <TextBlock Foreground="{Binding ConfidenceBrush}" FontSize="11" FontWeight="Bold">
-                                                                <Run Text="GUVEN "/><Run Text="%"/><Run Text="{Binding ConfidenceScore, Mode=OneWay}"/>
+                                                                <Run Text="KANIT "/><Run Text="{Binding ConfidenceScore, Mode=OneWay}"/><Run Text="/100"/>
                                                             </TextBlock>
                                                         </Border>
                                                         <TextBlock Text="{Binding SeverityText}" FontWeight="Bold" Foreground="{Binding SeverityBrush}" Margin="0,0,12,0"/>
@@ -656,7 +655,7 @@
                                 <TextBlock Text="Sistem, Sensor ve Surucu Envanteri" Style="{StaticResource SectionTitle}"/>
                                 <TextBlock Text="Tarama; Windows ve donanim ozelliklerini, anlik kaynak kullanimini, BIOS bilgilerini, ekran karti/chipset/depolama suruculerinin model-surum-tarih bilgisini okur. Sicaklik degeri yalnizca cihaz sensor sunuyorsa gosterilir." Style="{StaticResource MutedText}"/>
                                 <TextBlock Text="{Binding TemperatureRefreshText}" Style="{StaticResource MutedText}" Margin="0,8,0,0"/>
-                                <Button Content="HTML Raporu Disa Aktar" HorizontalAlignment="Left" Margin="0,12,0,0" Click="CreateReport_Click"/>
+
                             </StackPanel>
                         </Border>
                         <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">
@@ -705,23 +704,27 @@
                         </Grid.RowDefinitions>
                         <Border Style="{StaticResource Card}">
                             <StackPanel>
-                                <TextBlock Text="Gelismis Mavi Ekran ve Dump Analizi" Style="{StaticResource SectionTitle}"/>
-                                <TextBlock Text="Dump butunlugu, Microsoft sembolleri, !analyze, BugCheck parametreleri, stack, supheli .sys modulu, driver bilgisi ve ayni zamandaki WHEA/disk/GPU olaylari birlikte incelenir. Ilk sembol indirmesi birkac dakika surebilir." Style="{StaticResource MutedText}"/>
+                                <TextBlock Text="Mavi Ekran ve Dump Analizi" Style="{StaticResource SectionTitle}"/>
                                 <WrapPanel Margin="0,12,0,0">
-                                    <Button Content="Derin Analizi Baslat" Click="BlueScreen_Click" Style="{StaticResource PrimaryButton}"/>
-                                    <Button Content="Dump Dosyasi Sec" Click="SelectDump_Click"/>
-                                    <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
-                                    <Button Content="WinDbg Kur / Guncelle" Click="InstallWinDbg_Click"/>
+                                    <Button Content="Bu bilgisayarı incele" Click="BlueScreen_Click" Style="{StaticResource PrimaryButton}"/>
+                                    <Button Content="Haricî dump seç" Click="SelectDump_Click"/>
+                                    <Button Content="&#xE712;" FontFamily="Segoe Fluent Icons" Width="40" ToolTip="Vaka araçları" Click="CaseTools_Click" IsEnabled="{Binding IsIdle}">
+                                        <Button.ContextMenu><ContextMenu>
+                                            <MenuItem Header="Vaka EVTX ekle" Click="ImportCase_Click"/>
+                                            <MenuItem Header="Vaka sürücü envanteri ekle" Tag="inventory" Click="ImportCase_Click"/>
+                                            <Separator/>
+                                            <MenuItem Header="WinDbg kurulumu" Click="InstallWinDbg_Click"/>
+                                        </ContextMenu></Button.ContextMenu>
+                                    </Button>
                                 </WrapPanel>
-                                <Border Background="{StaticResource InsetBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,4,0,0">
-                                    <TextBlock Text="{Binding BlueScreenSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" FontSize="14" LineHeight="20"/>
-                                </Border>
                             </StackPanel>
                         </Border>
                         <TabControl Grid.Row="1" Background="Transparent" BorderThickness="0">
-                            <TabItem Header="Genel Teshis">
+                            <TabItem Header="Genel Teşhis">
                                 <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,10,0,0">
                                     <StackPanel>
+                                            <TextBlock Text="{Binding CaseStatus}" TextWrapping="Wrap" Foreground="{StaticResource MutedBrush}" Margin="0,0,0,8"/>
+                                            <TextBlock Text="{Binding BlueScreenSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,0,0,12"/>
                                         <Border Style="{StaticResource Card}">
                                             <StackPanel>
                                                 <TextBlock Text="ANALIZ OZETI" Foreground="{StaticResource AccentBrush}" FontWeight="Bold" FontSize="12"/>
@@ -751,6 +754,7 @@
                                                                     </StackPanel>
                                                                     <StackPanel Grid.Column="1">
                                                                         <TextBlock Text="{Binding Evidence}" Style="{StaticResource CopyableText}" TextWrapping="Wrap"/>
+                                                                        <TextBlock Text="{Binding RuleIdsText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                                         <TextBlock Text="{Binding Interpretation}" Style="{StaticResource CopyableText}" Foreground="{StaticResource MutedBrush}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                                     </StackPanel>
                                                                 </Grid>
@@ -845,35 +849,38 @@
                                                             <TextBlock Text="{Binding BugCheckCode}" FontWeight="Bold" Margin="0,0,8,0"/>
                                                             <TextBlock Text="{Binding BugCheckName}" FontWeight="Bold" TextWrapping="Wrap"/>
                                                         </StackPanel>
-                                                        <TextBlock Grid.Row="1" Text="Supheli bilesen" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
+                                                        <TextBlock Grid.Row="1" Text="Şüpheli bileşen" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SuspectedComponent}" Style="{StaticResource CopyableText}" Foreground="#FFD580" FontWeight="Bold" TextWrapping="Wrap" Margin="0,5,0,0"/>
-                                                        <TextBlock Grid.Row="2" Text="Bilesen bilgisi" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
+                                                        <TextBlock Grid.Row="2" Text="Bileşen bilgisi" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ComponentDetails}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0"/>
-                                                        <TextBlock Grid.Row="3" Text="Surec / hata kovasi" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
+                                                        <TextBlock Grid.Row="3" Text="Süreç / hata kovası" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <StackPanel Grid.Row="3" Grid.Column="1" Margin="0,5,0,0">
                                                             <TextBlock Text="{Binding ProcessName}" TextWrapping="Wrap"/>
                                                             <TextBlock Text="{Binding FailureBucket}" TextWrapping="Wrap" Foreground="#B1BAC4"/>
                                                         </StackPanel>
                                                         <TextBlock Grid.Row="4" Text="Dosya / analiz" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding IntegrityStatus}" TextWrapping="Wrap" Margin="0,5,0,0"/>
-                                                        <TextBlock Grid.Row="5" Text="Kanit (debugger)" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
+                                                        <TextBlock Grid.Row="5" Text="Kanıt (debugger)" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding Evidence}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0"/>
-                                                        <TextBlock Grid.Row="6" Text="Onerilen islem" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
+                                                        <TextBlock Grid.Row="6" Text="Önerilen işlem" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding Recommendation}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,5,0,0" Foreground="#C9D1D9"/>
                                                         <TextBlock Grid.Row="7" Text="Debugger" Foreground="{StaticResource MutedBrush}" Margin="0,5,0,0"/>
                                                         <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding DebuggerUsed}" TextWrapping="Wrap" Margin="0,5,0,0"/>
                                                     </Grid>
-                                                    <Expander Header="Teknik yorum, context ve pointer kaniti" Margin="0,10,0,0" Foreground="{StaticResource AccentBrush}">
+                                                    <Expander Header="Teknik yorum, context ve pointer kanıtı" Margin="0,10,0,0" Foreground="{StaticResource AccentBrush}">
                                                         <StackPanel Margin="0,8,0,0">
+                                                            <TextBlock Text="{Binding ProvenanceSummary}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,0,0,8"/>
                                                             <TextBlock Text="YORUM" Foreground="{StaticResource MutedBrush}" FontWeight="Bold"/>
                                                             <TextBlock Text="{Binding TechnicalInterpretation}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="{StaticResource TextBrush}" Margin="0,4,0,0"/>
                                                             <TextBlock Text="CONTEXT" Foreground="{StaticResource MutedBrush}" FontWeight="Bold" Margin="0,12,0,0"/>
                                                             <TextBlock Text="{Binding RegisterContextStatus}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                                             <TextBlock Text="{Binding RegisterSummary}" Style="{StaticResource CopyableText}" FontFamily="Consolas" TextWrapping="Wrap" Margin="0,4,0,0"/>
                                                             <TextBlock Text="{Binding PointerAnalysis}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Margin="0,6,0,0"/>
+                                                            <TextBlock Text="KOMUT ÇEVRESİ (çöken komuttan ayrı)" Margin="0,12,0,4" Foreground="{StaticResource MutedBrush}"/>
+                                                            <TextBlock Text="{Binding DisassemblyContext}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" FontFamily="Consolas"/>
                                                         </StackPanel>
                                                     </Expander>
-                                                    <Expander Header="Ham WinDbg ciktisi ve teknik ayrintilar" Margin="0,10,0,0" Foreground="{StaticResource AccentBrush}">
+                                                    <Expander Header="Ham WinDbg çıktısı ve teknik ayrıntılar" Margin="0,10,0,0" Foreground="{StaticResource AccentBrush}">
                                                         <TextBox Text="{Binding RawDebuggerOutput}" IsReadOnly="True" AcceptsReturn="True" TextWrapping="NoWrap"
                                                                  FontFamily="Consolas" FontSize="12" Height="260" Margin="0,8,0,0"
                                                                  Background="{StaticResource InsetBrush}" Foreground="#C9D1D9" BorderBrush="{StaticResource BorderBrush}"
@@ -917,7 +924,7 @@
                                 <TextBlock Text="Ayiklanan Sorunlar bolumu uygulama, surucu, aygit ve Windows bilesenlerini adiyla gosterir. Ham Olay Kayitlari bolumu incelenen Event Viewer kayitlarini tek tek saklar." Style="{StaticResource MutedText}"/>
                                 <WrapPanel Margin="0,12,0,0">
                                     <Button Content="Tam Taramayi Baslat" Click="StartScan_Click" Style="{StaticResource PrimaryButton}" IsEnabled="{Binding IsIdle}"/>
-                                    <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
+
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
@@ -972,7 +979,7 @@
                     </Grid>
                 </TabItem>
 
-                <TabItem Header="Guvenilirlik">
+                <TabItem Header="Güvenilirlik">
                     <Grid Margin="0,14,0,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="Auto"/>
@@ -984,7 +991,7 @@
                                 <TextBlock Text="Reliability Monitor kayitlari Win32_ReliabilityRecords ile okunur. Erisim kapaliysa hata acikca gosterilir." Style="{StaticResource MutedText}"/>
                                 <WrapPanel Margin="0,12,0,0">
                                     <Button Content="Guvenilirlik Verilerini Oku" Click="Reliability_Click" Style="{StaticResource PrimaryButton}"/>
-                                    <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
+
                                 </WrapPanel>
                             </StackPanel>
                         </Border>
@@ -1008,7 +1015,7 @@
                                 <Button Content="Durumu Yenile" Click="Protection_Click" Style="{StaticResource PrimaryButton}"/>
                                 <Button Content="Geri Yukleme Noktasi Olustur" Click="CreateRestorePoint_Click"/>
                                 <Button Content="Sistem Koruma Ayarlarini Ac" Click="OpenProtection_Click"/>
-                                <Button Content="HTML Raporu Disa Aktar" Click="CreateReport_Click"/>
+
                             </WrapPanel>
                             <DataGrid ItemsSource="{Binding RestorePoints}" AutoGenerateColumns="False" Height="360">
                                 <DataGrid.Columns>
@@ -1021,15 +1028,25 @@
                     </Border>
                 </TabItem>
 
-                <TabItem Header="Onarim Araclari">
-                    <ScrollViewer Margin="0,14,0,0">
-                        <WrapPanel>
+                <TabItem Header="Onarım Araçları">
+                    <ScrollViewer Margin="0,14,0,0" VerticalScrollBarVisibility="Auto">
+                        <StackPanel>
+                            <TextBlock Text="Sistem koruma" Style="{StaticResource SectionTitle}"/>
+                            <TextBlock Text="{Binding ProtectionStatus}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                            <WrapPanel>
+                                <Button Content="Koruma durumunu yenile" Click="Protection_Click"/>
+                                <Button Content="Geri yükleme noktası oluştur" Click="CreateRestorePoint_Click"/>
+                            </WrapPanel>
+                            <TextBlock Text="CHKDSK hedef birimi" Margin="0,8,0,4"/>
+                            <ComboBox ItemsSource="{Binding DiskDrives}" SelectedItem="{Binding SelectedDrive}" Width="140" HorizontalAlignment="Left" Margin="0,0,0,12"/>
+                            <WrapPanel>
                             <Button Content="SFC Taramasi" Tag="sfc" Click="Repair_Click"/>
                             <Button Content="DISM CheckHealth" Tag="dism-check" Click="Repair_Click"/>
                             <Button Content="DISM ScanHealth" Tag="dism-scan" Click="Repair_Click"/>
                             <Button Content="DISM RestoreHealth" Tag="dism-restore" Click="Repair_Click"/>
                             <Button Content="CHKDSK Kontrolu" Tag="chkdsk-scan" Click="Repair_Click"/>
-                            <Button Content="CHKDSK Onarim Zamanla" Tag="chkdsk-repair" Click="Repair_Click"/>
+                            <Button Content="CHKDSK /f onarım" Tag="chkdsk-repair" Click="Repair_Click"/>
+                            <Button Content="CHKDSK /r yüzey taraması" Tag="chkdsk-surface" Click="Repair_Click"/>
                             <Button Content="Windows Update Reset" Tag="wu-reset" Click="Repair_Click"/>
                             <Button Content="Ag Onarimi" Tag="network-reset" Click="Repair_Click"/>
                             <Button Content="DNS Temizle" Tag="dns" Click="Repair_Click"/>
@@ -1038,10 +1055,11 @@
                             <Button Content="Gecici Dosya Temizleme" Tag="temp" Click="Repair_Click"/>
                             <Button Content="Yazici Spooler Onarimi" Tag="spooler" Click="Repair_Click"/>
                         </WrapPanel>
+                    </StackPanel>
                     </ScrollViewer>
                 </TabItem>
 
-                <TabItem Header="Kisayollar">
+                <TabItem Header="Kısayollar">
                     <ScrollViewer Margin="0,14,0,0">
                         <ItemsControl ItemsSource="{Binding Shortcuts}">
                             <ItemsControl.ItemsPanel>
@@ -1074,7 +1092,7 @@
                         <StackPanel>
                             <TextBlock Text="Raporlama" Style="{StaticResource SectionTitle}"/>
                             <TextBlock Text="HTML ve TXT raporlar kullanici ozeti ve teknik detaylari birlikte icerir." Style="{StaticResource MutedText}"/>
-                            <Button Content="HTML Raporu Disa Aktar" Style="{StaticResource PrimaryButton}" Width="220" HorizontalAlignment="Left" Margin="0,14,0,0" Click="CreateReport_Click"/>
+
                             <TextBlock Text="{Binding ReportPath}" Style="{StaticResource CopyableText}" TextWrapping="Wrap" Foreground="#C9D1D9" Margin="0,14,0,0"/>
                         </StackPanel>
                     </Border>

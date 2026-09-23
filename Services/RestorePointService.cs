@@ -5,9 +5,9 @@ namespace ItchyWindowsTroubleshooter.Services;
 
 public sealed class RestorePointService
 {
-    private readonly CommandRunner _runner;
+    private readonly ICommandRunner _runner;
 
-    public RestorePointService(CommandRunner runner)
+    public RestorePointService(ICommandRunner runner)
     {
         _runner = runner;
     }
@@ -25,14 +25,20 @@ public sealed class RestorePointService
     public async Task<CommandResult> CreateRestorePointAsync(string description, CancellationToken cancellationToken)
     {
         var safeDescription = description.Replace("'", "''");
-        var script = $"Checkpoint-Computer -Description '{safeDescription}' -RestorePointType 'MODIFY_SETTINGS'; Write-Output 'Geri yukleme noktasi istegi gonderildi.'";
-        return await _runner.RunPowerShellAsync(script, cancellationToken);
+        var script = $$"""
+            $before = @(Get-ComputerRestorePoint -ErrorAction Stop | Select-Object -ExpandProperty SequenceNumber)
+            Checkpoint-Computer -Description '{{safeDescription}}' -RestorePointType 'MODIFY_SETTINGS' -ErrorAction Stop
+            $new = @(Get-ComputerRestorePoint -ErrorAction Stop | Where-Object { $_.SequenceNumber -notin $before -and $_.Description -eq '{{safeDescription}}' })
+            if ($new.Count -eq 0) { throw 'Yeni geri yükleme noktası doğrulanamadı; sıklık sınırı veya koruma ayarını kontrol edin.' }
+            Write-Output ('Doğrulanan yeni geri yükleme kimliği: ' + ($new.SequenceNumber -join ', '))
+            """;
+        return await _runner.RunPowerShellAsync(script, cancellationToken, policy: CommandCancellationPolicy.WaitForCompletion);
     }
 
     private async Task<IReadOnlyList<RestorePointItem>> GetRestorePointsAsync(CancellationToken cancellationToken)
     {
         var script = """
-            Get-ComputerRestorePoint -ErrorAction SilentlyContinue |
+            Get-ComputerRestorePoint -ErrorAction Stop |
               Sort-Object SequenceNumber -Descending |
               Select-Object -First 30 @{N='CreatedAt';E={$_.ConvertToDateTime($_.CreationTime).ToString('o')}},Description,RestorePointType |
               ConvertTo-Json -Depth 3 -Compress

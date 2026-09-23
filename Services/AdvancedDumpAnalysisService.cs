@@ -15,45 +15,13 @@ public sealed class AdvancedDumpAnalysisService
         "memory_corruption", "hardware", "unknown_image", "win32kfull.sys", "win32kbase.sys"
     };
 
-    private static readonly IReadOnlyDictionary<string, BugCheckDescription> BugChecks =
-        new Dictionary<string, BugCheckDescription>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["0xA"] = new("IRQL_NOT_LESS_OR_EQUAL", "Surucu gecersiz bellek adresine yuksek IRQL seviyesinde eristi; RAM bozulmasi da ihtimaldir.", "Suruculeri, RAM'i ve varsa overclock/XMP ayarlarini kontrol edin."),
-            ["0x1E"] = new("KMODE_EXCEPTION_NOT_HANDLED", "Kernel modunda yakalanmayan bir istisna olustu. Exception code, faulting instruction ve context asil kanitlardir.", "Faulting surucuyu temiz kurun; tekrarlayan erisim ihlalinde RAM/XMP/CPU bellek kararliligini da test edin."),
-            ["0x1A"] = new("MEMORY_MANAGEMENT", "Bellek yonetimi tutarsizlik tespit etti. RAM, depolama paging veya bellek bozan surucu olabilir.", "Windows Memory Diagnostic yerine uzun MemTest86 testi, XMP/EXPO kapatma ve surucu kontrolu yapin."),
-            ["0x3B"] = new("SYSTEM_SERVICE_EXCEPTION", "Kernel modunda sistem servisi istisnasi olustu; ucuncu taraf surucu veya bellek bozulmasi yaygin nedendir.", "Stack'teki ucuncu taraf surucuyu guncelleyin/kaldirin ve RAM testi yapin."),
-            ["0x50"] = new("PAGE_FAULT_IN_NONPAGED_AREA", "Gecerli olmasi gereken kernel bellegine erisim basarisiz oldu. Surucu, RAM veya disk kaynakli olabilir.", "RAM, disk ve stack'te gorunen surucuyu birlikte kontrol edin."),
-            ["0x7B"] = new("INACCESSIBLE_BOOT_DEVICE", "Windows acilis diskine erisemedi. NVMe/SATA/VMD modu, depolama surucusu veya disk sorunu olabilir.", "BIOS depolama modunu, NVMe/SATA sagligini ve chipset/depolama surucusunu kontrol edin."),
-            ["0x7E"] = new("SYSTEM_THREAD_EXCEPTION_NOT_HANDLED", "Bir sistem is parcaciginda yakalanmayan istisna olustu; genellikle surucu kaynaklidir.", "IMAGE_NAME ve stack'te gorunen ucuncu taraf surucuyu temiz kurulumla guncelleyin."),
-            ["0x7F"] = new("UNEXPECTED_KERNEL_MODE_TRAP", "CPU trap hatasi; RAM, CPU, overclock, BIOS veya dusuk seviyeli surucu ihtimali vardir.", "BIOS varsayilanlari, RAM/CPU testi ve sicaklik kontrolu yapin."),
-            ["0x9F"] = new("DRIVER_POWER_STATE_FAILURE", "Bir surucu guc durumu istegini zamaninda tamamlamadi.", "Uyku/uyanma ve kapanma ile ilgili aygit surucusunu, BIOS ve chipset surucusunu guncelleyin."),
-            ["0xC2"] = new("BAD_POOL_CALLER", "Bir surucu kernel bellek havuzunu hatali kullandi.", "Verifier/stack tarafindan isaretlenen ucuncu taraf surucuyu kaldirin veya guncelleyin."),
-            ["0xC4"] = new("DRIVER_VERIFIER_DETECTED_VIOLATION", "Driver Verifier bir surucu ihlali yakaladi.", "WinDbg'nin isaretledigi surucuyu duzeltin; test bitince Driver Verifier'i kapatin."),
-            ["0xC5"] = new("DRIVER_CORRUPTED_EXPOOL", "Surucu kernel bellek havuzunu bozdu.", "Stack ve IMAGE_NAME alanindaki surucuyu onceleyin; RAM testi de yapin."),
-            ["0xD1"] = new("DRIVER_IRQL_NOT_LESS_OR_EQUAL", "Kernel surucusu gecersiz veya sayfalanabilir bellege yanlis IRQL seviyesinde eristi.", "Isaretlenen .sys surucusunu temiz kurulumla guncelleyin veya onceki kararli surume donun."),
-            ["0xEF"] = new("CRITICAL_PROCESS_DIED", "Windows icin kritik bir surec beklenmedik sekilde sonlandi. Disk, sistem dosyasi veya surucu etkisi olabilir.", "Disk/NTFS olaylarini, SFC-DISM sonucunu ve PROCESS_NAME alanini birlikte inceleyin."),
-            ["0xF4"] = new("CRITICAL_OBJECT_TERMINATION", "Kritik sistem sureci veya is parcacigi sonlandi; depolama ve sistem dosyalari sik nedendir.", "SMART, disk kablosu/denetleyicisi, sistem dosyalari ve ilgili sureci kontrol edin."),
-            ["0x101"] = new("CLOCK_WATCHDOG_TIMEOUT", "Bir CPU cekirdegi beklenen clock kesmesini vermedi. CPU/BIOS/voltaj/overclock ihtimali yuksektir.", "BIOS varsayilanlari, BIOS guncellemesi, CPU sicakligi ve guc kaynagini kontrol edin."),
-            ["0x109"] = new("CRITICAL_STRUCTURE_CORRUPTION", "Kernel kodu veya kritik veri bozuldu. Surucu, RAM ya da kernel degisikligi olabilir.", "RAM testi yapin; dusuk seviyeli guvenlik, RGB, overclock ve sanallastirma suruculerini kontrol edin."),
-            ["0x10E"] = new("VIDEO_MEMORY_MANAGEMENT_INTERNAL", "Ekran bellegi yonetiminde kritik hata olustu.", "GPU surucusunu temiz kurun; VRAM/GPU sicakligi ve guc kaynagini kontrol edin."),
-            ["0x116"] = new("VIDEO_TDR_FAILURE", "GPU zaman asimindan sonra ekran surucusu kurtarilamadi.", "GPU surucusunu temiz kurun; GPU sicakligi, guc ve donanim kararliligini kontrol edin."),
-            ["0x117"] = new("VIDEO_TDR_TIMEOUT_DETECTED", "GPU veya ekran surucusu zaman asimina ugradi.", "Ekran surucusu, GPU sicakligi ve guc kaynagini kontrol edin."),
-            ["0x119"] = new("VIDEO_SCHEDULER_INTERNAL_ERROR", "GPU zamanlayicisi kritik bir ihlal algiladi.", "Ekran surucusunu temiz kurun ve GPU/VRAM kararliligini test edin."),
-            ["0x124"] = new("WHEA_UNCORRECTABLE_ERROR", "WHEA duzeltilemeyen donanim hatasi bildirdi. CPU, RAM, PCIe, GPU, NVMe veya anakart olabilir.", "WHEA kaydini, BIOS'u, XMP/overclock ayarlarini, sicakliklari ve donanim stres testlerini inceleyin."),
-            ["0x12B"] = new("FAULTY_HARDWARE_CORRUPTED_PAGE", "Windows donanim kaynakli bozulmus bellek sayfasi tespit etti.", "RAM'i modulleri tek tek test ederek kontrol edin; CPU bellek denetleyicisi ve XMP/EXPO'yu da inceleyin."),
-            ["0x133"] = new("DPC_WATCHDOG_VIOLATION", "Bir DPC/ISR rutini cok uzun surdu. Depolama, ag, GPU veya diger kernel suruculeri yaygin nedendir.", "Stack'teki surucuyu, NVMe/SATA ve chipset suruculerini guncelleyin."),
-            ["0x139"] = new("KERNEL_SECURITY_CHECK_FAILURE", "Kernel veri yapisi bozuldu. Surucu bellek ihlali veya RAM sorunu olabilir.", "Stack'teki ucuncu taraf surucuyu ve RAM'i kontrol edin."),
-            ["0x14F"] = new("PDC_WATCHDOG_TIMEOUT", "Guc yonetimi islemi zaman asimina ugradi.", "BIOS, chipset ve guc yonetimiyle iliskili aygit suruculerini guncelleyin."),
-            ["0x154"] = new("UNEXPECTED_STORE_EXCEPTION", "Kernel depolama bileseni beklenmeyen istisna bildirdi. Disk/NVMe, dosya sistemi veya bellek etkili olabilir.", "SMART, NTFS/disk olaylari, NVMe firmware ve RAM'i kontrol edin.")
-        };
-
-    private readonly CommandRunner _runner;
+    private readonly ICommandRunner _runner;
     private readonly Func<string, Task> _log;
     private readonly WinDbgOutputParser _parser = new();
     private readonly DriverClassificationService _driverClassifier = new();
     private readonly DumpCorrelationService _correlationService = new();
 
-    public AdvancedDumpAnalysisService(CommandRunner runner, Func<string, Task> log)
+    public AdvancedDumpAnalysisService(ICommandRunner runner, Func<string, Task> log)
     {
         _runner = runner;
         _log = log;
@@ -62,8 +30,11 @@ public sealed class AdvancedDumpAnalysisService
     public async Task<BlueScreenScanResult> AnalyzeAsync(
         IReadOnlyList<string> dumpPaths,
         IReadOnlyList<EventRecordItem> contextEvents,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DumpAnalysisContext? context = null)
     {
+        context ??= DumpAnalysisContext.External;
+        contextEvents = context.AllowLocalData ? contextEvents : context.CaseEvents;
         var distinctPaths = dumpPaths
             .Where(File.Exists)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -71,7 +42,7 @@ public sealed class AdvancedDumpAnalysisService
             .Take(10)
             .ToList();
 
-        var debugger = await FindDebuggerAsync(cancellationToken);
+        var debugger = await FindDebuggerAsync(cancellationToken).ConfigureAwait(false);
         if (debugger is null && distinctPaths.Count > 0)
         {
             await _log("WinDbg/KD bulunamadi. Dump basligi ve Event Viewer verileriyle sinirli analiz yapilacak.");
@@ -81,7 +52,8 @@ public sealed class AdvancedDumpAnalysisService
         foreach (var path in distinctPaths)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            analyses.Add(await AnalyzeSingleAsync(path, debugger, contextEvents, cancellationToken));
+            await _log($"Dump {analyses.Count + 1}/{distinctPaths.Count}: {Path.GetFileName(path)}");
+            analyses.Add(await AnalyzeSingleAsync(path, debugger, contextEvents, cancellationToken, context));
         }
 
         var signals = BuildEventSignals(contextEvents);
@@ -99,17 +71,12 @@ public sealed class AdvancedDumpAnalysisService
         string dumpPath,
         DebuggerTool? debugger,
         IReadOnlyList<EventRecordItem> contextEvents,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        DumpAnalysisContext context)
     {
         var info = new FileInfo(dumpPath);
         var integrity = InspectDump(dumpPath);
-        var correlated = GetCorrelatedEvents(info.LastWriteTime, contextEvents);
-        var nearestBugCheck = contextEvents
-            .Where(IsBugCheckEvent)
-            .Where(x => x.TimeCreated.HasValue)
-            .Where(x => Math.Abs((x.TimeCreated!.Value - info.LastWriteTime).TotalMinutes) <= 60)
-            .OrderBy(x => Math.Abs((x.TimeCreated!.Value - info.LastWriteTime).TotalMinutes))
-            .FirstOrDefault();
+        var correlated = new CorrelationResult("Çökme zamanı doğrulanmadı; dosya değiştirilme zamanı korelasyon için kullanılmaz.", false, false, false);
 
         var rawOutput = "";
         var debuggerUsed = debugger?.DisplayName ?? "WinDbg/KD bulunamadi";
@@ -135,7 +102,7 @@ public sealed class AdvancedDumpAnalysisService
             Directory.CreateDirectory(symbolCache);
 
             var symbolPath = $"srv*{symbolCache}*https://msdl.microsoft.com/download/symbols";
-            var commands = "!analyze -v; .bugcheck; .echo ITCHY_BASE_REGISTERS; r; .echo ITCHY_DISASSEMBLY; u @rip-20 L40; kv; lm t n; !blackboxbsd; !blackboxntfs; !blackboxpnp; !blackboxwinlogon; q";
+            var commands = ".time; !analyze -v; .bugcheck; .echo ITCHY_BASE_REGISTERS; r; .echo ITCHY_DISASSEMBLY; u @rip L1; .echo ITCHY_INSTRUCTION_CONTEXT; ub @rip L8; u @rip L8; kv; lm t n; !blackboxbsd; !blackboxntfs; !blackboxpnp; !blackboxwinlogon; q";
             var arguments = $"-z {Quote(dumpPath)} -y {Quote(symbolPath)} -logo {Quote(rawPath)} -c {Quote(commands)}";
             var commandResult = await _runner.RunExecutableAsync(
                 debugger.Path,
@@ -160,7 +127,7 @@ public sealed class AdvancedDumpAnalysisService
                 }
             }
 
-            var preliminary = _parser.Parse(rawOutput, nearestBugCheck?.Message ?? "");
+            var preliminary = _parser.Parse(rawOutput);
             var contextAddress = BugCheckKnowledgeBase.TryGetContextRecord(
                 preliminary.BugCheckCode,
                 preliminary.BugCheckArguments,
@@ -168,7 +135,7 @@ public sealed class AdvancedDumpAnalysisService
             if (!string.IsNullOrWhiteSpace(contextAddress) && commandResult.ExitCode != -1)
             {
                 await _log($"{info.Name}: {preliminary.BugCheckCode} semantigine uygun context record {contextAddress} inceleniyor.");
-                var contextCommands = $".echo ITCHY_CONTEXT_BEGIN; .cxr {contextAddress}; .echo ITCHY_CONTEXT_REGISTERS; r; .echo ITCHY_CONTEXT_STACK; kv; .echo ITCHY_CONTEXT_DISASSEMBLY; u @rip-20 L40; q";
+                var contextCommands = $".echo ITCHY_CONTEXT_BEGIN; .cxr {contextAddress}; .echo ITCHY_CONTEXT_REGISTERS; r; .echo ITCHY_CONTEXT_STACK; kv; .echo ITCHY_CONTEXT_DISASSEMBLY; u @rip L1; .echo ITCHY_INSTRUCTION_CONTEXT; ub @rip L8; u @rip L8; q";
                 var contextArguments = $"-z {Quote(dumpPath)} -y {Quote(symbolPath)} -c {Quote(contextCommands)}";
                 var contextResult = await _runner.RunExecutableAsync(
                     debugger.Path,
@@ -187,7 +154,8 @@ public sealed class AdvancedDumpAnalysisService
                 : commandResult.ExitCode == -1 ? "Zaman asimi" : "Debugger dump'i tam cozumleyemedi";
         }
 
-        var parsed = _parser.Parse(rawOutput, nearestBugCheck?.Message ?? "");
+        var parsed = _parser.Parse(rawOutput);
+        if (parsed.CrashTime.HasValue) correlated = GetCorrelatedEvents(parsed.CrashTime.Value, contextEvents);
         if (string.IsNullOrWhiteSpace(parsed.BugCheckCode) && !string.IsNullOrWhiteSpace(integrity.BugCheckCode))
         {
             parsed = parsed with
@@ -226,15 +194,19 @@ public sealed class AdvancedDumpAnalysisService
         }
         var bugCheck = DescribeBugCheck(parsed.BugCheckCode);
         var component = ResolveSuspectedComponent(parsed, bugCheck);
-        var componentDetails = _driverClassifier.GetMetadata(component);
-        var thirdPartyDrivers = _driverClassifier.BuildEvidence(parsed);
+        var caseDriver = context.CaseDrivers.FirstOrDefault(x => x.DeviceName.Equals(component, StringComparison.OrdinalIgnoreCase));
+        var componentDetails = context.AllowLocalData
+            ? "Yerel dosya; çökme anındaki sürüm olmayabilir. " + _driverClassifier.GetMetadata(component)
+            : caseDriver is null ? "Haricî vaka: yerel sürücü sürümü kullanılmadı. Dump modül ayrıntıları ham çıktıda bulunabilir."
+            : $"Vaka envanteri: {caseDriver.Manufacturer}, {caseDriver.DriverVersion}, {caseDriver.DriverDate}";
+        var thirdPartyDrivers = _driverClassifier.BuildEvidence(parsed, context.AllowLocalData);
         var isExplicitThirdParty = IsExplicitThirdParty(component, componentDetails);
         var confidence = DetermineConfidence(parsed, bugCheck, component, isExplicitThirdParty, correlated);
-        if (thirdPartyDrivers.Any(x => x.DirectFault)) confidence = "Yuksek";
+        if (thirdPartyDrivers.Any(x => x.DirectFault)) confidence = parsed.SymbolsIncomplete ? "Orta" : "Yuksek";
         if (HasSymbolProblems(rawOutput)) confidence = DowngradeConfidence(confidence);
         var rootCause = BuildRootCause(parsed, bugCheck, component, confidence, integrity);
         var evidence = BuildEvidence(parsed, integrity, correlated);
-        var recommendation = BuildRecommendation(bugCheck, component, componentDetails);
+        var recommendation = BuildRecommendation(bugCheck, component, componentDetails, thirdPartyDrivers.Any(x => x.DirectFault) && !parsed.SymbolsIncomplete);
         var registerSummary = parsed.Registers.Count == 0
             ? ""
             : string.Join("  ", parsed.Registers.Select(x => $"{x.Key}={x.Value}"));
@@ -247,7 +219,7 @@ public sealed class AdvancedDumpAnalysisService
         var item = new DumpAnalysisItem(
             info.Name,
             info.FullName,
-            info.LastWriteTime,
+            parsed.CrashTime,
             FormatSize(info.Length),
             integrity.Status,
             analysisStatus,
@@ -266,6 +238,11 @@ public sealed class AdvancedDumpAnalysisService
             debuggerUsed,
             rawForReport)
         {
+            AnalysisMode = context.Mode,
+            TimeSource = parsed.CrashTime.HasValue ? "WinDbg Debug session time" : "Bilinmiyor; dosya zamanı kullanılmadı",
+            FaultEvidenceSource = parsed.FaultEvidenceSource,
+            DisassemblyContext = parsed.DisassemblyContext,
+            SymbolsIncomplete = parsed.SymbolsIncomplete,
             ExceptionCode = parsed.ExceptionCode,
             ExceptionName = parsed.ExceptionName,
             BugCheckString = parsed.BugCheckString,
@@ -451,8 +428,8 @@ public sealed class AdvancedDumpAnalysisService
         bool isExplicitThirdParty,
         CorrelationResult correlated)
     {
-        if (isExplicitThirdParty && !string.IsNullOrWhiteSpace(parsed.ProbablyCausedBy)) return "Yuksek";
-        if (isExplicitThirdParty && !string.IsNullOrWhiteSpace(parsed.ImageName)) return "Orta-Yuksek";
+        if (isExplicitThirdParty && !string.IsNullOrWhiteSpace(parsed.ProbablyCausedBy)) return "Orta";
+        if (isExplicitThirdParty && !string.IsNullOrWhiteSpace(parsed.ImageName)) return "Dusuk";
         if (parsed.BugCheckCode.Equals("0x124", StringComparison.OrdinalIgnoreCase) && correlated.HasWhea) return "Yuksek";
         if (component.Contains("GPU", StringComparison.OrdinalIgnoreCase) && correlated.HasDisplay) return "Orta-Yuksek";
         if (component.Contains("Disk", StringComparison.OrdinalIgnoreCase) && correlated.HasStorage) return "Orta-Yuksek";
@@ -472,14 +449,14 @@ public sealed class AdvancedDumpAnalysisService
             return $"Dump dosyasi bozuk veya eksik gorunuyor: {integrity.Status}. Asil kaynak stack uzerinden belirlenemedi.";
         }
 
-        if (SameModule(component, parsed.FaultingModule) && !GenericComponents.Contains(component))
+        if (parsed.FaultEvidenceSource != FaultEvidenceSource.Unknown && SameModule(component, parsed.FaultingModule) && !GenericComponents.Contains(component))
         {
-            return $"Bu dump'in faulting instruction/module kaniti dogrudan {component} icindedir. Bu nedenle surucu bu dump icin guclu birincil suphelidir. {bugCheck.Explanation} Guven: {confidence}.";
+            return $"Bu dump'ın doğrulanmış exception adresi {component} modül aralığındadır. Bu nedenle surucu bu dump icin guclu birincil suphelidir. {bugCheck.Explanation} Guven: {confidence}.";
         }
 
         if (!string.IsNullOrWhiteSpace(parsed.ProbablyCausedBy) && SameModule(component, parsed.ProbablyCausedBy))
         {
-            return $"WinDbg {component} surucusunu 'Probably caused by' alaninda isaretliyor. Bu guclu bir kanittir ancak daha once olusan bellek bozulmasini tek basina dislamaz. {bugCheck.Explanation} Guven: {confidence}.";
+            return $"WinDbg {component} surucusunu 'Probably caused by' alaninda isaretliyor. Bu debugger değerlendirmesidir, doğrulanmış çökme konumu değildir ve daha once olusan bellek bozulmasini tek basina dislamaz. {bugCheck.Explanation} Guven: {confidence}.";
         }
 
         if (IsKernelComponent(component) || IsKernelComponent(parsed.FaultingModule))
@@ -522,8 +499,9 @@ public sealed class AdvancedDumpAnalysisService
         return string.Join(Environment.NewLine, lines);
     }
 
-    private static string BuildRecommendation(BugCheckDescription bugCheck, string component, string componentDetails)
+    private static string BuildRecommendation(BugCheckDescription bugCheck, string component, string componentDetails, bool verifiedFault)
     {
+        if (!verifiedFault) return "Doğrudan çökme konumu yeterince doğrulanmadı. Sembolleri, exception adresini ve bağımsız olay kanıtlarını inceleyin; yalnız modül adına dayanarak sürücü kaldırmayın.";
         var recommendation = string.IsNullOrWhiteSpace(bugCheck.Recommendation)
             ? "Supheli bilesenin surucusunu uretici sitesinden kontrol edin; BIOS, RAM ve disk bulgularini olay korelasyonuyla birlikte degerlendirin."
             : bugCheck.Recommendation;
@@ -640,7 +618,7 @@ public sealed class AdvancedDumpAnalysisService
         {
             return new BugCheckDescription(knowledge.Name, knowledge.Explanation, knowledge.Recommendation);
         }
-        return BugChecks.TryGetValue(code, out var description) ? description : new BugCheckDescription("", "", "");
+        return new BugCheckDescription("", "", "");
     }
 
     private static bool IsExplicitThirdParty(string component, string details)

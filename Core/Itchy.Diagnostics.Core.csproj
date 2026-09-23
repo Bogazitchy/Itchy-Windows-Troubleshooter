@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="..\Models\AppModels.cs" Link="Models\AppModels.cs" />
+    <Compile Include="..\Services\WinDbgOutputParser.cs" Link="WinDbgOutputParser.cs" />
+    <Compile Include="..\Services\BugCheckKnowledgeBase.cs" Link="BugCheckKnowledgeBase.cs" />
+    <Compile Include="..\Services\DriverClassificationService.cs" Link="DriverClassificationService.cs" />
+    <Compile Include="..\Services\DumpCorrelationService.cs" Link="DumpCorrelationService.cs" />
+    <Compile Include="..\Services\CommandRunner.cs" Link="CommandRunner.cs" />
+    <Compile Include="..\Services\RepairScripts.cs" Link="RepairScripts.cs" />
+    <Compile Include="..\Services\RepairOutcomeParser.cs" Link="RepairOutcomeParser.cs" />
+  </ItemGroup>
+</Project>

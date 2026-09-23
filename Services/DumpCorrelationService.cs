@@ -67,7 +67,9 @@ public sealed class DumpCorrelationService
             patterns.Add(new RecurringPattern(
                 "Tekrarlayan pointer deseni",
                 $"{group.Count()} dump ayni erisilmeye calisilan adresi gosteriyor: {group.Key}.",
-                "Ayni gecersiz pointer deseni kernel veri yapisi bozulmasi, hatali surucu veya bellek kararsizligi ihtimalini guclendirir."));
+                group.Any(x => x.InvalidPointerIndicators.Count > 0)
+                    ? "Tekrarlayan ve debugger kanıtıyla geçersiz görünen pointer deseni sürücü/bellek kararlılığı incelemesini destekler."
+                    : "Aynı hedef adres tekrarlanıyor; adresin geçersizliği veya kök neden tek başına doğrulanmaz."));
         }
 
         var processes = DistinctMeaningful(dumps.Select(x => x.ProcessName));
@@ -123,7 +125,7 @@ public sealed class DumpCorrelationService
         foreach (var dump in dumps)
         {
             var graphics = dump.ImportantThirdPartyDrivers.Where(x => x.Category == "Graphics").ToList();
-            if (graphics.Any(x => x.DirectFault)) Add(scores, RootCauseCategory.GraphicsDriver, 80, $"{dump.FileName}: faulting module/instruction {graphics.First(x => x.DirectFault).DriverName} icinde.");
+            if (graphics.Any(x => x.DirectFault)) Add(scores, RootCauseCategory.GraphicsDriver, dump.SymbolsIncomplete ? 45 : 80, $"{dump.FileName}: doğrulanmış adres {graphics.First(x => x.DirectFault).DriverName} modül aralığında. Sembol eksik: {dump.SymbolsIncomplete}.", dump.SymbolsIncomplete ? "gpu.address.symbols-missing" : "gpu.address.verified");
             else if (graphics.Any(x => x.ProbablyCausedBy)) Add(scores, RootCauseCategory.GraphicsDriver, 40, $"{dump.FileName}: WinDbg Probably caused by GPU surucusunu gosteriyor.");
             else if (graphics.Any(x => x.IsImageName || x.IsModuleName)) Add(scores, RootCauseCategory.GraphicsDriver, 25, $"{dump.FileName}: IMAGE_NAME/MODULE_NAME GPU surucusu.");
             else if (graphics.Count > 0) Add(scores, RootCauseCategory.GraphicsDriver, 8, $"{dump.FileName}: GPU surucusu stack'te mevcut.");
@@ -154,13 +156,13 @@ public sealed class DumpCorrelationService
         {
             var ratio = exceptionAv == dumps.Count ? 35 : 25;
             Add(scores, RootCauseCategory.MemoryInstability, ratio, $"{exceptionAv}/{dumps.Count} dump 0xC0000005 Access Violation.");
-            Add(scores, RootCauseCategory.KernelDriverConflict, 20, $"{exceptionAv}/{dumps.Count} dump ayni kernel bellek erisim sinifinda.");
+            if (distinctDrivers.Count >= 2) Add(scores, RootCauseCategory.KernelDriverConflict, 20, $"{exceptionAv}/{dumps.Count} dump ayni kernel bellek erisim sinifinda.");
         }
         if (distinctBugChecks >= 2 && exceptionAv >= 2) Add(scores, RootCauseCategory.MemoryInstability, 14, "Farkli stop code'larda ayni erisim ihlali tekrar ediyor.");
         if (distinctProcesses >= 2 && exceptionAv >= 2)
         {
             Add(scores, RootCauseCategory.MemoryInstability, 12, "Ayni bellek erisim sinifi farkli process'lerde olustu.");
-            Add(scores, RootCauseCategory.KernelDriverConflict, 14, "Farkli kullanici process'lerinde ortak kernel sorun sinifi.");
+            if (distinctDrivers.Count >= 2) Add(scores, RootCauseCategory.KernelDriverConflict, 14, "Farkli kullanici process'lerinde ortak kernel sorun sinifi.");
         }
         if (distinctDrivers.Count >= 2) Add(scores, RootCauseCategory.KernelDriverConflict, 20, $"{distinctDrivers.Count} farkli ucuncu parti kernel surucusu crash stack'lerinde.");
         if (distinctDrivers.Count >= 4) Add(scores, RootCauseCategory.KernelDriverConflict, 15, "Cok sayida dusuk seviyeli ucuncu parti surucu ayni crash doneminde aktif.");
@@ -170,11 +172,14 @@ public sealed class DumpCorrelationService
             dump.CreatedAt.HasValue && Math.Abs((item.TimeCreated.Value - dump.CreatedAt.Value).TotalMinutes) <= 20));
         foreach (var item in correlatedEvents)
         {
+            if (item.Id == 41 && item.Provider.Contains("Kernel-Power", StringComparison.OrdinalIgnoreCase)) continue;
             if (item.Provider.Contains("WHEA", StringComparison.OrdinalIgnoreCase))
             {
                 Add(scores, RootCauseCategory.Hardware, 25, $"WHEA-Logger Event {item.Id}.");
-                Add(scores, RootCauseCategory.CpuInstability, 15, $"WHEA-Logger Event {item.Id}.");
-                Add(scores, RootCauseCategory.MemoryInstability, 10, $"WHEA-Logger Event {item.Id}.");
+                if (item.Message.Contains("processor", StringComparison.OrdinalIgnoreCase) || item.Message.Contains("işlemci", StringComparison.OrdinalIgnoreCase))
+                    Add(scores, RootCauseCategory.CpuInstability, 15, $"WHEA CPU belirtisi: Event {item.Id}.");
+                if (item.Message.Contains("memory", StringComparison.OrdinalIgnoreCase) || item.Message.Contains("bellek", StringComparison.OrdinalIgnoreCase))
+                    Add(scores, RootCauseCategory.MemoryInstability, 10, $"WHEA bellek belirtisi: Event {item.Id}.");
             }
             if (IsDisplay(item.Provider)) Add(scores, RootCauseCategory.GraphicsDriver, 15, $"{item.Provider} Event {item.Id} dump doneminde kayitli.");
             if (IsStorage(item.Provider)) Add(scores, RootCauseCategory.Storage, 18, $"{item.Provider} Event {item.Id} dump doneminde kayitli.");
@@ -213,7 +218,9 @@ public sealed class DumpCorrelationService
         };
         var interpretation = category switch
         {
-            RootCauseCategory.GraphicsDriver => "Dogrudan GPU surucusu veya video stack kaniti bu kategoriyi destekliyor.",
+            RootCauseCategory.GraphicsDriver => score.Rules.Contains("gpu.address.verified")
+                ? "Doğrulanmış exception adresi GPU sürücüsü modül aralığında; yazılımsal şüphelidir, kök neden tek başına kanıtlanmaz."
+                : "İlgili modül/video kanıtı var; doğrudan çökme konumu yeterli güvenle doğrulanmadı.",
             RootCauseCategory.KernelDriverConflict => "Dump, belleği daha once hangi surucunun bozdugunu her zaman gostermez; kontrollu surucu izolasyonu gerekir.",
             RootCauseCategory.MemoryInstability => "Desen RAM/XMP/CPU bellek denetleyicisi kararsizligiyla uyumlu; fiziksel ariza ancak testle dogrulanabilir.",
             RootCauseCategory.CpuInstability => "CPU, BIOS, voltaj veya overclock kararliligi test edilmelidir.",
@@ -230,7 +237,11 @@ public sealed class DumpCorrelationService
             Strength(score.Score),
             string.Join(" ", score.Evidence.Distinct(StringComparer.OrdinalIgnoreCase).Take(4)),
             interpretation,
-            Recommendation(category));
+            category == RootCauseCategory.GraphicsDriver && !score.Rules.Contains("gpu.address.verified")
+                ? "Sürücü varlığı tek başına müdahale gerektirmez. Çökme adresini ve sembolleri doğrulayın." : Recommendation(category))
+        {
+            RuleIds = score.Rules.OrderBy(x => x).ToList()
+        };
     }
 
     private static string BuildSummary(IReadOnlyList<DumpAnalysisItem> dumps)
@@ -257,7 +268,7 @@ public sealed class DumpCorrelationService
         if (invalidCount > 0) lines.Add($"{invalidCount}/{dumps.Count} dump'ta debugger kanitli gecersiz pointer/adres deseni var.");
         if (processCount >= 2) lines.Add("Cokmeler farkli kullanici islemleri sirasinda olustugu icin tek bir uygulama ortak kok neden olarak zayiftir.");
         if (lines.Count == 0) lines.Add("Dump'larda tek ve baskin bir ortak hata deseni kanitlanamadi; her dump ayri degerlendirilmelidir.");
-        else lines.Add("Ortak desen kernel seviyesinde surucu veya bellek/pointer kararliligi problemine isaret ediyor.");
+        else if (avCount >= 2 || invalidCount > 0) lines.Add("Ortak desen kernel seviyesinde surucu veya bellek/pointer kararliligi problemine isaret ediyor.");
         return string.Join(Environment.NewLine, lines);
     }
 
@@ -266,7 +277,8 @@ public sealed class DumpCorrelationService
         if (candidates.Count == 0) return "Mevcut dump verisi belirli bir kok nedeni siralamak icin yetersiz. Eksik sembol veya context guveni dusurur.";
         var primary = candidates[0];
         var secondary = candidates.Skip(1).Take(2).Select(x => $"{x.Title} ({x.Strength})").ToList();
-        var directGraphics = dumps.SelectMany(x => x.ImportantThirdPartyDrivers).FirstOrDefault(x => x.DirectFault && x.Category == "Graphics");
+        var directGraphics = primary.Category == RootCauseCategory.GraphicsDriver
+            ? dumps.Where(x => !x.SymbolsIncomplete).SelectMany(x => x.ImportantThirdPartyDrivers).FirstOrDefault(x => x.DirectFault && x.Category == "Graphics") : null;
         var opening = directGraphics is null
             ? $"En guclu kok neden adayi {primary.Title} ({primary.Strength})."
             : $"En guclu yazilimsal supheli {directGraphics.DisplayName} ({directGraphics.DriverName}); en az bir dump'in faulting instruction/module kaniti dogrudan bu surucudadir.";
@@ -278,7 +290,7 @@ public sealed class DumpCorrelationService
     {
         var steps = new List<string>();
         var categories = candidates.Select(x => x.Category).ToHashSet();
-        if (categories.Contains(RootCauseCategory.GraphicsDriver))
+        if (candidates.Any(x => x.Category == RootCauseCategory.GraphicsDriver && x.RuleIds.Contains("gpu.address.verified")))
         {
             steps.Add("GPU overclock/undervolt ayarlarini kapatin; DDU ile Guvenli Mod'da mevcut ekran surucusunu temizleyin.");
             steps.Add("Ureticinin temiz ekran surucusunu kurun; ilk testte overlay ve ek bilesenleri minimumda tutun.");
@@ -326,8 +338,11 @@ public sealed class DumpCorrelationService
         _ => "Zayif"
     };
 
-    private static void Add(IDictionary<RootCauseCategory, CategoryScore> scores, RootCauseCategory category, int amount, string evidence)
+    private static void Add(IDictionary<RootCauseCategory, CategoryScore> scores, RootCauseCategory category, int amount, string evidence, string? ruleId = null)
     {
+        // Repetition of the same rule is one evidence source, not an independent vote.
+        ruleId ??= $"{category}.evidence-{amount}";
+        if (!scores[category].Rules.Add(ruleId)) return;
         scores[category].Score += amount;
         scores[category].Evidence.Add(evidence);
     }
@@ -353,5 +368,6 @@ public sealed class DumpCorrelationService
     {
         public int Score { get; set; }
         public List<string> Evidence { get; } = [];
+        public HashSet<string> Rules { get; } = new(StringComparer.Ordinal);
     }
 }

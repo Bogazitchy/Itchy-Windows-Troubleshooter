@@ -1,5 +1,3 @@
-using System.Windows.Media;
-
 namespace ItchyWindowsTroubleshooter.Models;
 
 public enum Severity
@@ -58,20 +56,20 @@ public sealed record Finding(Severity Severity, string Title, string Cause, stri
         }
     }
 
-    public Brush SeverityBrush => Severity switch
+    public string SeverityBrush => Severity switch
     {
-        Severity.Critical => Brushes.IndianRed,
-        Severity.Warning => Brushes.Orange,
-        Severity.Success => Brushes.MediumSeaGreen,
-        _ => Brushes.DeepSkyBlue
+        Severity.Critical => "IndianRed",
+        Severity.Warning => "Orange",
+        Severity.Success => "MediumSeaGreen",
+        _ => "DeepSkyBlue"
     };
 
-    public Brush ConfidenceBrush => ConfidenceScore switch
+    public string ConfidenceBrush => ConfidenceScore switch
     {
-        >= 90 => Brushes.IndianRed,
-        >= 75 => Brushes.Orange,
-        >= 50 => Brushes.Gold,
-        _ => Brushes.DeepSkyBlue
+        >= 90 => "IndianRed",
+        >= 75 => "Orange",
+        >= 50 => "Gold",
+        _ => "DeepSkyBlue"
     };
 }
 
@@ -89,6 +87,20 @@ public enum RootCauseCategory
     NetworkDriver,
     SecurityOrAntiCheatDriver,
     Unknown
+}
+
+public enum FaultEvidenceSource { Unknown, ExceptionAddressModuleRange }
+public enum AnalysisMode { LocalComputer, ExternalCase }
+public enum DataAvailability { Read, Inaccessible, Unsupported, Partial, Uninterpretable }
+public enum RepairOutcome { Succeeded, PartiallySucceeded, Failed, RestartRequired, Unverified }
+
+public sealed record DumpAnalysisContext(AnalysisMode Mode)
+{
+    public bool AllowLocalData => Mode == AnalysisMode.LocalComputer;
+    public IReadOnlyList<EventRecordItem> CaseEvents { get; init; } = [];
+    public IReadOnlyList<DriverInfoItem> CaseDrivers { get; init; } = [];
+    public static DumpAnalysisContext Local { get; } = new(AnalysisMode.LocalComputer);
+    public static DumpAnalysisContext External { get; } = new(AnalysisMode.ExternalCase);
 }
 
 public sealed record StackDriverEvidence(
@@ -113,7 +125,11 @@ public sealed record RootCauseCandidate(
     string Strength,
     string Evidence,
     string Interpretation,
-    string Recommendation);
+    string Recommendation)
+{
+    public IReadOnlyList<string> RuleIds { get; init; } = [];
+    public string RuleIdsText => string.Join(", ", RuleIds);
+}
 
 public sealed record RecurringPattern(string Title, string Evidence, string Interpretation);
 
@@ -168,6 +184,12 @@ public sealed record DumpAnalysisItem(
     string DebuggerUsed,
     string RawDebuggerOutput)
 {
+    public FaultEvidenceSource FaultEvidenceSource { get; init; }
+    public AnalysisMode AnalysisMode { get; init; }
+    public string TimeSource { get; init; } = "Bilinmiyor";
+    public string DisassemblyContext { get; init; } = "";
+    public string ProvenanceSummary => $"Mod: {AnalysisMode}; zaman kaynağı: {TimeSource}; doğrudan kanıt: {FaultEvidenceSource}.";
+    public bool SymbolsIncomplete { get; init; }
     public string ExceptionCode { get; init; } = "";
     public string ExceptionName { get; init; } = "";
     public string BugCheckString { get; init; } = "";
@@ -212,12 +234,12 @@ public sealed record DumpAnalysisItem(
           (string.IsNullOrWhiteSpace(AccessType) ? "" : $" | {AccessType}") +
           (string.IsNullOrWhiteSpace(AttemptedAddress) ? "" : $" | {AttemptedAddress}");
 
-    public Brush ConfidenceBrush => Confidence switch
+    public string ConfidenceBrush => Confidence switch
     {
-        "Yuksek" => Brushes.IndianRed,
-        "Orta-Yuksek" => Brushes.OrangeRed,
-        "Orta" => Brushes.Orange,
-        _ => Brushes.DeepSkyBlue
+        "Yuksek" => "IndianRed",
+        "Orta-Yuksek" => "OrangeRed",
+        "Orta" => "Orange",
+        _ => "DeepSkyBlue"
     };
 }
 
@@ -252,7 +274,10 @@ public sealed record DriverInfoItem(
     string HardwareId,
     string Status);
 
-public sealed record ResourceMetricItem(string Name, string Value, string Status, string Detail);
+public sealed record ResourceMetricItem(string Name, string Value, string Status, string Detail)
+{
+    public DataAvailability Availability { get; init; } = DataAvailability.Read;
+}
 
 public sealed record HealthCheckItem(
     DateTime? ObservedAt,
@@ -260,9 +285,28 @@ public sealed record HealthCheckItem(
     string Component,
     string Status,
     string Value,
-    string Detail);
+    string Detail)
+{
+    public DataAvailability Availability => Status switch
+    {
+        "Okunamadi" or "Erisilemedi" => DataAvailability.Inaccessible,
+        "Yorumlanamadi" => DataAvailability.Uninterpretable,
+        "Kismi" => DataAvailability.Partial,
+        _ when Value is "Veri sunulmadi" or "Okunamadi" or "Sonuc bulunamadi" => DataAvailability.Unsupported,
+        _ => DataAvailability.Read
+    };
+}
 
-public sealed record ScanCoverageItem(string Source, string Status, int RecordCount, string Detail);
+public sealed record ScanCoverageItem(string Source, string Status, int RecordCount, string Detail)
+{
+    public DataAvailability Availability => Status switch
+    {
+        "Tamamlandi" => DataAvailability.Read,
+        "Kismi" => DataAvailability.Partial,
+        "Atlandi" => DataAvailability.Unsupported,
+        _ => DataAvailability.Inaccessible
+    };
+}
 
 public sealed record SystemHealthScanResult(
     IReadOnlyList<HealthCheckItem> Checks,
@@ -289,7 +333,18 @@ public sealed record CommandResult(string Command, int ExitCode, string Output, 
 
 public sealed record RepairPlan(string Id, string Title, string Description, string Safety, string Duration, string RestartNote, string AdminNote);
 
-public sealed record RepairResult(string Title, bool Success, int ExitCode, string Output, DateTime StartedAt, DateTime FinishedAt);
+public sealed record RepairResult(string Title, bool Success, int ExitCode, string Output, DateTime StartedAt, DateTime FinishedAt)
+{
+    public RepairOutcome Outcome { get; init; } = RepairOutcome.Unverified;
+    public string OutcomeText => Outcome switch
+    {
+        RepairOutcome.Succeeded => "Başarılı",
+        RepairOutcome.PartiallySucceeded => "Kısmen başarılı",
+        RepairOutcome.RestartRequired => "Yeniden başlatma gerekli",
+        RepairOutcome.Failed => "Başarısız",
+        _ => "Komut tamamlandı; değişiklik doğrulanamadı"
+    };
+}
 
 public sealed record ProtectionStatus(string Summary, IReadOnlyList<RestorePointItem> RestorePoints);
 

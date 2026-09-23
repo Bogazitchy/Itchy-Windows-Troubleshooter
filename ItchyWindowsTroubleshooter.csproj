@@ -8,9 +8,9 @@
     <UseWPF>true</UseWPF>
     <ApplicationIcon />
     <AssemblyName>ITCHY Windows Troubleshooter</AssemblyName>
-    <Version>1.3.0</Version>
-    <FileVersion>1.3.0.0</FileVersion>
-    <AssemblyVersion>1.3.0.0</AssemblyVersion>
+    <Version>1.4.0</Version>
+    <FileVersion>1.4.0.0</FileVersion>
+    <AssemblyVersion>1.4.0.0</AssemblyVersion>
     <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
     <Authors>Bogazitchy</Authors>
     <Description>Windows 10/11 system diagnostics and advanced blue screen dump analysis.</Description>
@@ -23,6 +23,8 @@
 
   <ItemGroup>
     <Compile Remove="Tests\**\*.cs" />
+    <Compile Remove="Core\**\*.cs;Models\AppModels.cs;Services\WinDbgOutputParser.cs;Services\BugCheckKnowledgeBase.cs;Services\DriverClassificationService.cs;Services\DumpCorrelationService.cs;Services\CommandRunner.cs;Services\RepairScripts.cs;Services\RepairOutcomeParser.cs" />
+    <ProjectReference Include="Core\Itchy.Diagnostics.Core.csproj" />
   </ItemGroup>
 
 </Project>

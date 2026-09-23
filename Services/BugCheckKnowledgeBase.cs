@@ -47,6 +47,7 @@ public static class BugCheckKnowledgeBase
         return NormalizeCode(bugCheckCode) switch
         {
             "0x1E" or "0x3B" or "0x7E" => NormalizeAddress(Argument(arguments, 1)),
+            "0xA" or "0xD1" => NormalizeAddress(Argument(arguments, 3)),
             _ => ""
         };
     }
@@ -76,6 +77,7 @@ public static class BugCheckKnowledgeBase
 
     public static string TryGetContextRecord(string bugCheckCode, IReadOnlyList<string> arguments, string parsedContext)
     {
+        if (NormalizeCode(bugCheckCode) is not ("0x3B" or "0x7E")) return "";
         if (IsUsableAddress(parsedContext)) return NormalizeAddress(parsedContext);
         var index = NormalizeCode(bugCheckCode) switch
         {
@@ -132,6 +134,8 @@ public static class BugCheckKnowledgeBase
     {
         var items = new[]
         {
+            I("0xF4", "CRITICAL_OBJECT_TERMINATION", "Kritik sistem süreci veya iş parçacığı sonlandı.", "Depolama, sistem dosyaları ve kernel sürücülerini inceleyin.", "Nesne türü", "Nesne", "Süreç adı", "Mesaj"),
+            I("0x14F", "PDC_WATCHDOG_TIMEOUT", "Güç yönetimi işlemi zaman aşımına uğradı.", "BIOS, chipset ve güç yönetimi sürücülerini inceleyin.", "Alt tür", "Alt türe özel", "Alt türe özel", "Alt türe özel"),
             I("0xA", "IRQL_NOT_LESS_OR_EQUAL", "Yuksek IRQL seviyesinde gecersiz bellek erisimi. Surucu veya bellek kararliligi arastirilmalidir.", "Stack suruculerini, RAM'i ve OC/XMP ayarlarini kontrol edin.", "Erisilen adres", "IRQL", "Erisim tipi", "Komut adresi"),
             I("0x1E", "KMODE_EXCEPTION_NOT_HANDLED", "Kernel modunda yakalanmayan bir istisna olustu. Exception code ve faulting instruction asil kanittir.", "Faulting surucuyu temiz kurun; tekrarlayan erisim ihlalinde bellek kararliligini da test edin.", "Exception code", "Exception adresi", "Exception parametresi 0", "Exception parametresi 1"),
             I("0x1A", "MEMORY_MANAGEMENT", "Bellek yonetimi tutarsizlik tespit etti. RAM, paging veya bellek bozan surucu olabilir.", "XMP/EXPO'yu kapatin ve uzun MemTest86 testi uygulayin.", "Alt tur", "Alt ture ozel", "Alt ture ozel", "Alt ture ozel"),

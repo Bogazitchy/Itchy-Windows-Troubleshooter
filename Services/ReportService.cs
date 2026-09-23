@@ -139,7 +139,7 @@ public sealed class ReportService
         BeginSection(html, "protection", "Koruma ve Onarim", "Geri yukleme noktalari ve calistirilan islemler");
         html.AppendLine($"<article class='card' data-searchable><h3>Sistem Koruma</h3><p>{E(s.ProtectionStatus)}</p></article>");
         AppendTable(html, "Geri Yukleme Noktalari", ["Zaman", "Aciklama", "Tip"], s.RestorePoints.Select(x => new[] { x.CreatedAt?.ToString("dd.MM.yyyy HH:mm") ?? "", x.Description, x.Type }));
-        AppendTable(html, "Calistirilan Onarimlar", ["Baslik", "Basladi", "Bitti", "Sonuc"], s.RepairHistory.Select(x => new[] { x.Title, x.StartedAt.ToString("dd.MM.yyyy HH:mm"), x.FinishedAt.ToString("dd.MM.yyyy HH:mm"), x.Success ? "Basarili" : $"Hata ({x.ExitCode})" }));
+        AppendTable(html, "Calistirilan Onarimlar", ["Baslik", "Basladi", "Bitti", "Sonuc"], s.RepairHistory.Select(x => new[] { x.Title, x.StartedAt.ToString("dd.MM.yyyy HH:mm"), x.FinishedAt.ToString("dd.MM.yyyy HH:mm"), x.OutcomeText }));
         EndSection(html);
 
         BeginSection(html, "logs", "Ham Uygulama Logu", "Tarama ve komut calistirma gecmisi");
@@ -183,6 +183,7 @@ public sealed class ReportService
         {
             text.AppendLine($"{candidate.Title} - {candidate.Strength}");
             text.AppendLine($"Kanit: {candidate.Evidence}");
+            text.AppendLine($"Kurallar: {string.Join(", ", candidate.RuleIds)}");
             text.AppendLine($"Yorum: {candidate.Interpretation}");
         }
         text.AppendLine();
@@ -200,7 +201,7 @@ public sealed class ReportService
         text.AppendLine("Bulgular");
         foreach (var finding in s.Findings)
         {
-            text.AppendLine($"[{finding.SeverityText}] {finding.Title} - Guven %{finding.ConfidenceScore} ({finding.Confidence})");
+            text.AppendLine($"[{finding.SeverityText}] {finding.Title} - Kanıt puanı {finding.ConfidenceScore}/100 ({finding.Confidence})");
             text.AppendLine($"Bilesen / Rol: {finding.Component} / {finding.Role}");
             text.AppendLine($"Guncellik / Tekrar / Kaynak: {finding.RecencyText} / {finding.OccurrenceCount} / {finding.IndependentSourceCount}");
             text.AppendLine($"Mavi Ekran Iliskisi: {finding.CrashRelation}");
@@ -219,6 +220,8 @@ public sealed class ReportService
             text.AppendLine($"BugCheck: {item.BugCheckCode} {item.BugCheckName}");
             text.AppendLine($"Exception: {item.ExceptionSummary}");
             text.AppendLine($"Faulting: {item.FaultingAddress} {item.FaultingModule} {item.FaultingSymbol} - {item.FaultingInstruction}".Trim());
+            text.AppendLine($"Kanıt kaynağı: {item.FaultEvidenceSource}; mod: {item.AnalysisMode}; zaman: {item.TimeSource}");
+            text.AppendLine($"Komut çevresi: {item.DisassemblyContext}");
             text.AppendLine($"Ucuncu parti stack: {item.ImportantThirdPartyDriversText}");
             text.AppendLine($"Supheli: {item.SuspectedComponent}; Guven: {item.Confidence}");
             text.AppendLine($"Kanit: {item.Evidence}");
@@ -316,7 +319,7 @@ public sealed class ReportService
         text.AppendLine("Onarim Gecmisi");
         foreach (var item in s.RepairHistory)
         {
-            text.AppendLine($"{item.Title} - {(item.Success ? "Basarili" : "Hata")} - {item.StartedAt:dd.MM.yyyy HH:mm}");
+            text.AppendLine($"{item.Title} - {item.OutcomeText} - {item.StartedAt:dd.MM.yyyy HH:mm}");
             text.AppendLine(item.Output);
         }
 
@@ -329,7 +332,7 @@ public sealed class ReportService
     private static void AppendFindingCard(StringBuilder html, Finding finding)
     {
         html.AppendLine("<article class='card' data-searchable>");
-        html.AppendLine($"<div class='finding-head'><b class='{finding.Severity.ToString().ToLowerInvariant()}'>{E(finding.SeverityText)}</b><span class='pill'>Guven %{finding.ConfidenceScore} - {E(finding.Confidence)}</span><h3>{E(finding.Title)}</h3></div>");
+        html.AppendLine($"<div class='finding-head'><b class='{finding.Severity.ToString().ToLowerInvariant()}'>{E(finding.SeverityText)}</b><span class='pill'>Kanıt puanı {finding.ConfidenceScore}/100 - {E(finding.Confidence)}</span><h3>{E(finding.Title)}</h3></div>");
         html.AppendLine($"<p class='finding-meta'><b>Bilesen:</b> {E(finding.Component)} | <b>Rol:</b> {E(finding.Role)} | <b>Guncellik:</b> {E(finding.RecencyText)} | <b>Tekrar:</b> {finding.OccurrenceCount} | <b>Bagimsiz kaynak:</b> {finding.IndependentSourceCount}</p>");
         html.AppendLine($"<p><b>Mavi ekran iliskisi:</b> {E(finding.CrashRelation)}</p><p><b>Kanit korelasyonu:</b> {E(finding.Correlation)}</p><p><b>Muhtemel Sebep:</b> {E(finding.Cause)}</p><p><b>Kanit:</b> {E(finding.Evidence)}</p><p><b>Onerilen Islem:</b> {E(finding.Recommendation)}</p>");
         if (!string.IsNullOrWhiteSpace(finding.SearchKey))
@@ -409,13 +412,13 @@ public sealed class ReportService
         html.AppendLine($"<article class='card summary-card' data-searchable><h3>Mavi Ekran Genel Teshisi</h3><p>{E(analysis.Summary)}</p><p><b>{E(analysis.Diagnosis)}</b></p></article>");
         html.AppendLine($"<article class='card' data-searchable><h3>Ortak Dump Desenleri</h3><p style='white-space:pre-line'>{E(analysis.CommonPattern)}</p><p style='white-space:pre-line'><span class='label'>Kanit</span><br>{E(analysis.EvidenceSummary)}</p><p style='white-space:pre-line'><span class='label'>Yorum</span><br>{E(analysis.InterpretationSummary)}</p></article>");
         AppendTable(html, "Supheli Kaynaklar",
-            ["Oncelik", "Aday", "Kanit Gucu", "Dogrudan Kanit", "Teknik Yorum"],
+            ["Oncelik", "Aday", "Kanit Gucu", "Kanıt / Kural", "Teknik Yorum"],
             analysis.Candidates.Select((x, index) => new[]
             {
                 (index + 1).ToString(),
                 x.Title,
                 x.Strength,
-                x.Evidence,
+                x.Evidence + " | Kurallar: " + string.Join(", ", x.RuleIds),
                 x.Interpretation
             }));
         html.AppendLine($"<article class='card' data-searchable><h3>Onerilen Troubleshooting Sirasi</h3><p style='white-space:pre-line'>{E(analysis.TroubleshootingSummary)}</p></article>");
@@ -442,6 +445,9 @@ public sealed class ReportService
             AppendPair(html, "Faulting address", item.FaultingAddress);
             AppendPair(html, "Faulting module / symbol", $"{item.FaultingModule} {item.FaultingSymbol}".Trim());
             AppendPair(html, "Faulting instruction", item.FaultingInstruction);
+            AppendPair(html, "Kanıt kaynağı / çalışma modu", $"{item.FaultEvidenceSource} / {item.AnalysisMode}");
+            AppendPair(html, "Çökme zamanı kaynağı", item.TimeSource);
+            AppendPair(html, "Komut çevresi (çöken komut değildir)", item.DisassemblyContext);
             AppendPair(html, "Probably caused by", item.ProbablyCausedBy);
             AppendPair(html, "IMAGE / MODULE / SYMBOL", $"{item.ImageName} / {item.ModuleName} / {item.SymbolName}");
             AppendPair(html, "Supheli bilesen", item.SuspectedComponent);

@@ -6,6 +6,7 @@ using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
 using System.Security.Principal;
 using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -51,11 +52,29 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _temperatureRefreshText = "Sistem bilgileri yukleniyor...";
     private string _scanStage = "Hazir";
     private bool _isBusy;
+    private bool _canCancel = true;
+    private bool _externalCase;
+    private string[] _casePaths = [];
+    private DumpAnalysisContext _caseContext = DumpAnalysisContext.External;
+    private readonly Stopwatch _elapsed = new();
+    private readonly DispatcherTimer _progressTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+    public string ElapsedText => IsBusy ? $"Geçen süre: {_elapsed.Elapsed:hh\\:mm\\:ss}" : "";
+    public bool CanCancel => IsBusy && _canCancel;
+    public bool IsCompactLayout => Content is FrameworkElement { ActualHeight: > 0 } content ? content.ActualHeight < 650 : Height < 650;
+    public string CancelLabel => _canCancel ? "İptal et" : "Tamamlanması bekleniyor";
+    public string CaseStatus => _externalCase
+        ? $"Haricî vaka: {_casePaths.Length} dump, {_caseContext.CaseEvents.Count} vaka olayı. Yerel olay ve sürücü bilgileri kullanılmaz."
+        : "Bu bilgisayar: yerel olaylar yalnız doğrulanmış çökme zamanı çevresinde eşleştirilir.";
+    public IReadOnlyList<string> DiskDrives { get; } = DriveInfo.GetDrives().Where(x => x.DriveType == DriveType.Fixed).Select(x => x.Name.TrimEnd('\\')).ToList();
+    public string SelectedDrive { get; set; } = Path.GetPathRoot(Environment.SystemDirectory)?.TrimEnd('\\') ?? "";
+
     private int _criticalCount;
     private int _warningCount;
     private int _infoCount;
 
-    public MainWindow()
+    public MainWindow() : this(true) { }
+
+    internal MainWindow(bool initializeBackgroundServices)
     {
         InitializeComponent();
         _commandRunner = new CommandRunner(AppendLogAsync);
@@ -66,13 +85,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Shortcuts = new ObservableCollection<ShortcutItem>(_shortcutService.GetShortcuts());
         AdminStatus = IsAdministrator() ? "Yonetici izni: Var" : "Yonetici izni: Yok. Bazi onarimlar icin yonetici olarak calistirin.";
         DataContext = this;
-        Loaded += MainWindow_Loaded;
+        ((FrameworkElement)Content).SizeChanged += (_, _) => PropertyChanged?.Invoke(this, new(nameof(IsCompactLayout)));
+        if (initializeBackgroundServices) Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
         Closed += MainWindow_Closed;
         SourceInitialized += (_, _) => ApplyWindowTheme();
         AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(DataGrid_PreviewMouseRightButtonDown), true);
+        _progressTimer.Tick += (_, _) => PropertyChanged?.Invoke(this, new(nameof(ElapsedText)));
         _temperatureTimer.Tick += TemperatureTimer_Tick;
-        _ = RefreshProtectionAsync();
+        if (initializeBackgroundServices) _ = RefreshProtectionAsync();
     }
 
     public ObservableCollection<Finding> Findings { get; } = new();
@@ -112,6 +133,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _isBusy = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsBusy)));
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsIdle)));
+            PropertyChanged?.Invoke(this, new(nameof(CanCancel)));
         }
     }
     public bool IsIdle => !IsBusy;
@@ -124,6 +146,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {
         Loaded -= MainWindow_Loaded;
+        var area = SystemParameters.WorkArea;
+        Width = Math.Min(Width, area.Width);
+        Height = Math.Min(Height, area.Height);
         await LoadStartupSystemInfoAsync();
         _temperatureTimer.Start();
     }
@@ -131,6 +156,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
         _temperatureTimer.Stop();
+        _progressTimer.Stop();
         _cts?.Cancel();
     }
 
@@ -142,7 +168,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         e.Cancel = true;
-        AppendLog("Tarama devam ederken pencere kapatma istegi engellendi. Once taramayi iptal edin.");
+        AppendLog(_canCancel ? "İşlem sürüyor. Önce iptal edin ve alt süreçlerin kapanmasını bekleyin." : "Onarım güvenle kesilemez. Tamamlanması bekleniyor.");
     }
 
     private async void TemperatureTimer_Tick(object? sender, EventArgs e)
@@ -210,9 +236,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         await RunBusyAsync(async token =>
         {
+            SetCaseMode(false);
             ClearScanData();
             AppendLog("Genel sistem taramasi basladi.");
-            var result = await _analysisService.RunGeneralScanAsync(token);
+            var result = await _analysisService.RunGeneralScanAsync(token, sender is Button { Tag: "quick" });
             ApplyResult(result);
         });
     }
@@ -223,6 +250,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             BlueScreenItems.Clear();
             DumpAnalyses.Clear();
+            SetCaseMode(false);
             BlueScreenSummary = "Dump dosyalari ve semboller analiz ediliyor...";
             CrossDumpAnalysis = CrossDumpAnalysisResult.Empty;
             var result = await _analysisService.AnalyzeBlueScreensAsync(token);
@@ -248,10 +276,55 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             BlueScreenItems.Clear();
             DumpAnalyses.Clear();
+            _casePaths = dialog.FileNames;
+            _caseContext = DumpAnalysisContext.External;
+            SetCaseMode(true);
             BlueScreenSummary = $"{dialog.FileNames.Length} dump dosyasi analiz ediliyor...";
             CrossDumpAnalysis = CrossDumpAnalysisResult.Empty;
-            var result = await _analysisService.AnalyzeSelectedDumpsAsync(dialog.FileNames, token);
+            var result = await _analysisService.AnalyzeSelectedDumpsAsync(dialog.FileNames, token, _caseContext);
             ApplyBlueScreenResult(result);
+        });
+    }
+
+    private void SetCaseMode(bool external)
+    {
+        _externalCase = external;
+        PropertyChanged?.Invoke(this, new(nameof(CaseStatus)));
+    }
+
+    private void CaseTools_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { ContextMenu: { } menu } button)
+        {
+            menu.PlacementTarget = button;
+            menu.IsOpen = true;
+        }
+    }
+
+    private async void ImportCase_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_externalCase || _casePaths.Length == 0)
+        {
+            MessageBox.Show(this, "Önce haricî dump dosyalarını seçin.", "Haricî vaka");
+            return;
+        }
+        var inventory = sender is FrameworkElement { Tag: "inventory" };
+        var dialog = new OpenFileDialog { Filter = inventory ? "Sürücü envanteri (*.json)|*.json" : "Olay kaydı (*.evtx)|*.evtx", CheckFileExists = true };
+        if (dialog.ShowDialog(this) != true) return;
+        await RunBusyAsync(async token =>
+        {
+            if (inventory) _caseContext = _caseContext with { CaseDrivers = await CaseImportService.ReadInventoryAsync(dialog.FileName, token) };
+            else
+            {
+                var imported = await new CaseImportService(_commandRunner).ReadEventsAsync(dialog.FileName, token);
+                foreach (var coverage in imported.Coverage) AppendLog($"{coverage.Source}: {coverage.Status}. {coverage.Detail}");
+                if (imported.Coverage.Any(x => x.Status == "Erisilemedi")) throw new InvalidDataException("EVTX okunamadı; mevcut vaka değiştirilmedi.");
+                _caseContext = _caseContext with { CaseEvents = _caseContext.CaseEvents.Concat(imported.Events).Distinct().ToList() };
+            }
+            PropertyChanged?.Invoke(this, new(nameof(CaseStatus)));
+            DumpAnalyses.Clear();
+            BlueScreenItems.Clear();
+            ApplyBlueScreenResult(await _analysisService.AnalyzeSelectedDumpsAsync(_casePaths, token, _caseContext));
         });
     }
 
@@ -271,13 +344,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             var result = await _commandRunner.RunCmdAsync(
                 "winget install --id Microsoft.WinDbg -e --accept-package-agreements --accept-source-agreements",
-                token);
+                token, CommandCancellationPolicy.WaitForCompletion);
             AppendLog(result.Success ? "WinDbg kurulum komutu tamamlandi." : "WinDbg winget ile kurulamadi; resmi kurulum sayfasi aciliyor.");
             if (!result.Success)
             {
                 Process.Start(new ProcessStartInfo("https://learn.microsoft.com/windows-hardware/drivers/debugger/") { UseShellExecute = true });
             }
-        });
+        }, canCancel: false);
     }
 
     private async void ErrorAnalysis_Click(object sender, RoutedEventArgs e)
@@ -327,9 +400,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         await RunBusyAsync(async token =>
         {
             var result = await _restorePointService.CreateRestorePointAsync("ITCHY onarim oncesi nokta", token);
+            AppendLog(result.Success ? "Yeni geri yükleme noktası kimliği doğrulandı." : "Geri yükleme noktası oluşturulamadı veya doğrulanamadı.");
             AppendLog(result.Output);
             await RefreshProtectionAsync();
-        });
+        }, canCancel: false);
     }
 
     private void OpenProtection_Click(object sender, RoutedEventArgs e)
@@ -350,21 +424,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        var message = $"{plan.Title}\n\n{plan.Description}\n\nGuvenli mi: {plan.Safety}\nSure: {plan.Duration}\nYeniden baslatma: {plan.RestartNote}\nYonetici izni: {plan.AdminNote}\n\nDevam edilsin mi?";
-        var answer = MessageBox.Show(message, "Onarim onayi", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-        if (answer != MessageBoxResult.OK)
-        {
-            AppendLog($"{plan.Title} kullanici tarafindan iptal edildi.");
-            return;
-        }
-
         await RunBusyAsync(async token =>
         {
-            AppendLog($"{plan.Title} baslatildi.");
-            var result = await _repairService.RunAsync(id, token);
+            await RefreshProtectionAsync();
+            string? manifest = null;
+            var preview = "";
+            if (id == "temp")
+            {
+                manifest = await _repairService.PreviewTempAsync(token);
+                using var doc = JsonDocument.Parse(manifest);
+                var files = doc.RootElement.EnumerateArray().ToList();
+                preview = $"\n\nÖnizleme: {files.Count} dosya; yalnız TEMP kökündeki 7 günden eski dosyalar. Alt klasörler silinmez.\n" +
+                    string.Join("\n", files.Take(12).Select(x => x.GetProperty("FullName").GetString())) +
+                    (files.Count > 12 ? "\nDiğer dosyalar işlem ayrıntılarına yazıldı." : "");
+                AppendLog("Temizlik önizlemesi:\n" + manifest);
+            }
+            var warning = id == "network-reset" ? "\n\nIP/DNS yapılandırması önce yerel JSON dosyasına kaydedilecek. Uzak masaüstü/VPN bağlantısı kesilebilir; yedek otomatik geri yükleme değildir." : "";
+            var drive = id.StartsWith("chkdsk") ? $"\nSeçilen birim: {SelectedDrive}. Yalnız yerel NTFS desteklenir." : "";
+            var message = $"{plan.Title}\n\n{plan.Description}\nRisk: {plan.Safety}\nSüre: {plan.Duration}\nYeniden başlatma: {plan.RestartNote}\n\nSistem koruma:\n{ProtectionStatus}{drive}{warning}{preview}\n\nDevam edilsin mi?";
+            if (MessageBox.Show(this, message, "Onarım onayı", MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK) return;
+            token.ThrowIfCancellationRequested();
+            SetCancellation(RepairService.CanCancel(id));
+            AppendLog($"{plan.Title} başlatıldı.");
+            var result = await _repairService.RunAsync(id, token, SelectedDrive, manifest);
             RepairHistory.Add(result);
             AppendLog(result.Output);
-            AppendLog(result.Success ? $"{plan.Title} tamamlandi." : $"{plan.Title} hata ile bitti. Cikis kodu: {result.ExitCode}");
+            AppendLog($"{plan.Title}: {result.OutcomeText}. Çıkış kodu: {result.ExitCode}");
         });
     }
 
@@ -405,6 +490,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 CrossDumpAnalysis = CrossDumpAnalysis
             };
 
+            if (_externalCase)
+                snapshot = snapshot with
+                {
+                    SystemStatus = "Haricî vaka", HeaderSummary = CaseStatus, AnalysisSummary = CrossDumpAnalysis.CommonPattern,
+                    SystemInfo = "Haricî vaka; analiz bilgisayarının envanteri rapora eklenmedi.",
+                    Findings = [], Events = _caseContext.CaseEvents, ReliabilityRecords = [], DiagnosticLogs = [],
+                    HealthChecks = [], ScanCoverage = [], SystemDetails = [], Drivers = _caseContext.CaseDrivers,
+                    ResourceMetrics = [], RestorePoints = [], RepairHistory = [], ProtectionStatus = "Bu vaka için bilinmiyor.",
+                    LogText = "Ham debugger çıktıları ilgili dump altında bulunur. Yerel işlem günlüğü vaka raporuna eklenmedi."
+                };
             var report = await _reportService.CreateReportAsync(snapshot, token);
             ReportPath = $"Rapor olusturuldu:\nHTML: {report.HtmlPath}\nTXT: {report.TextPath}";
             AppendLog(ReportPath);
@@ -414,8 +509,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Cancel_Click(object sender, RoutedEventArgs e)
     {
+        if (!CanCancel) { AppendLog("Bu işlem güvenle kesilemez; tamamlanması bekleniyor."); return; }
         _cts?.Cancel();
-        AppendLog("Iptal istegi gonderildi.");
+        ScanStage = "Alt süreçlerin sonlanması bekleniyor";
+        AppendLog("İptal istendi. Süreçler sonlanmadan yeni işlem başlatılamaz.");
     }
 
     private void CopyText_Executed(object sender, ExecutedRoutedEventArgs e)
@@ -547,7 +644,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
-    private async Task RunBusyAsync(Func<CancellationToken, Task> work)
+    private async Task RunBusyAsync(Func<CancellationToken, Task> work, bool canCancel = true)
     {
         if (IsBusy)
         {
@@ -556,6 +653,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         _cts = new CancellationTokenSource();
         IsBusy = true;
+        SetCancellation(canCancel);
+        _elapsed.Restart();
+        _progressTimer.Start();
         try
         {
             await work(_cts.Token);
@@ -573,10 +673,22 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         finally
         {
+            _progressTimer.Stop();
+            _elapsed.Stop();
             IsBusy = false;
+            SetCancellation(true);
+            PropertyChanged?.Invoke(this, new(nameof(ElapsedText)));
             _cts.Dispose();
             _cts = null;
         }
+    }
+
+    private void SetCancellation(bool allowed)
+    {
+        _canCancel = allowed;
+        PropertyChanged?.Invoke(this, new(nameof(CanCancel)));
+        PropertyChanged?.Invoke(this, new(nameof(CancelLabel)));
+        if (!allowed) ScanStage = "İptal edilemez; tamamlanması bekleniyor";
     }
 
     private void ApplyResult(GeneralScanResult result)
@@ -715,6 +827,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private static string? ResolveScanStage(string text)
     {
+        if (text.StartsWith("Dump ", StringComparison.Ordinal)) return text;
         if (text.Contains("Genel tarama", StringComparison.OrdinalIgnoreCase)) return "Tarama kaynaklari hazirlaniyor";
         if (text.Contains("Event Viewer", StringComparison.OrdinalIgnoreCase) || text.Contains("olay kayit", StringComparison.OrdinalIgnoreCase)) return "Olay kayitlari okunuyor";
         if (text.Contains("Reliability", StringComparison.OrdinalIgnoreCase) || text.Contains("Guvenilirlik", StringComparison.OrdinalIgnoreCase)) return "Guvenilirlik gecmisi okunuyor";

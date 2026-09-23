@@ -5,10 +5,10 @@ namespace ItchyWindowsTroubleshooter.Services;
 
 public sealed class SystemHealthAnalysisService
 {
-    private readonly CommandRunner _runner;
+    private readonly ICommandRunner _runner;
     private readonly Func<string, Task> _log;
 
-    public SystemHealthAnalysisService(CommandRunner runner, Func<string, Task> log)
+    public SystemHealthAnalysisService(ICommandRunner runner, Func<string, Task> log)
     {
         _runner = runner;
         _log = log;
@@ -35,15 +35,16 @@ public sealed class SystemHealthAnalysisService
         var healthResult = await healthTask;
         coverage.Add(new ScanCoverageItem(
             "Yerel sistem sagligi",
-            healthResult.Success && checks.Count > 0 ? "Tamamlandi" : "Kismi",
+            healthResult.Success && checks.Count > 0 && checks.All(x => x.Availability == DataAvailability.Read) ? "Tamamlandi" : "Kismi",
             checks.Count,
             healthResult.Success ? "Disk, dump, pagefile, bellek ve yeniden baslatma durumu sorgulandi." : "Bazi yerel saglik verileri okunamadi."));
 
         var dism = await dismTask;
-        checks.Add(BuildDismCheck(dism));
+        var dismCheck = BuildDismCheck(dism);
+        checks.Add(dismCheck);
         coverage.Add(new ScanCoverageItem(
             "Windows bilesen deposu",
-            dism.Success ? "Tamamlandi" : "Erisilemedi",
+            !dism.Success ? "Erisilemedi" : dismCheck.Status == "Yorumlanamadi" ? "Kismi" : "Tamamlandi",
             dism.Success ? 1 : 0,
             dism.Success ? "DISM /CheckHealth salt okunur denetimi tamamlandi." : "DISM denetimi tamamlanamadi; yonetici izni gerekebilir."));
 
@@ -100,10 +101,10 @@ public sealed class SystemHealthAnalysisService
                   if ($null -ne $counter.ReadErrorsTotal) { $detailParts.Add("Okuma hatasi: $($counter.ReadErrorsTotal)") | Out-Null }
                   if ($null -ne $counter.WriteErrorsTotal) { $detailParts.Add("Yazma hatasi: $($counter.WriteErrorsTotal)") | Out-Null }
                   if ($counter.ReadErrorsTotal -gt 0 -or $counter.WriteErrorsTotal -gt 0) { if ($status -eq 'Normal') { $status = 'Uyari' } }
-                } catch {}
+                } catch { Add-Check 'Depolama' "$($disk.FriendlyName) sayaçları" 'Okunamadi' 'Erisilemedi' $_.Exception.Message }
                 Add-Check 'Depolama' $disk.FriendlyName $status "$($disk.HealthStatus), $([math]::Round($disk.Size / 1GB, 1)) GB" ($detailParts -join '; ')
               }
-            } catch {}
+            } catch { Add-Check 'Depolama' 'Get-PhysicalDisk' 'Okunamadi' 'Erisilemedi' $_.Exception.Message }
 
             if (-not $storageRead) {
               try {
@@ -140,25 +141,25 @@ public sealed class SystemHealthAnalysisService
             }
 
             $pending = [System.Collections.Generic.List[string]]::new()
+            try {
             if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Component Based Servicing\RebootPending') { $pending.Add('Component Based Servicing') | Out-Null }
             if (Test-Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\WindowsUpdate\Auto Update\RebootRequired') { $pending.Add('Windows Update') | Out-Null }
-            try {
-              $session = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -Name PendingFileRenameOperations -ErrorAction Stop
+              $session = Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager' -ErrorAction Stop
               if ($session.PendingFileRenameOperations) { $pending.Add('Bekleyen dosya yeniden adlandirma') | Out-Null }
-            } catch {}
             Add-Check 'Windows' 'Bekleyen yeniden baslatma' $(if ($pending.Count -gt 0) { 'Uyari' } else { 'Normal' }) $(if ($pending.Count -gt 0) { 'Var' } else { 'Yok' }) $(if ($pending.Count -gt 0) { $pending -join ', ' } else { 'Bekleyen yeniden baslatma isareti bulunmadi.' })
+            } catch { Add-Check 'Windows' 'Bekleyen yeniden baslatma' 'Okunamadi' 'Erisilemedi' $_.Exception.Message }
 
             try {
               $os = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
               $uptime = (Get-Date) - $os.LastBootUpTime
               Add-Check 'Windows' 'Sistem calisma suresi' 'Bilgi' "$([math]::Floor($uptime.TotalDays)) gun $($uptime.Hours) saat" "Son acilis: $($os.LastBootUpTime.ToString('dd.MM.yyyy HH:mm'))"
-            } catch {}
+            } catch { Add-Check 'Windows' 'Sistem calisma suresi' 'Okunamadi' 'Erisilemedi' $_.Exception.Message }
 
             $checks | ConvertTo-Json -Depth 5 -Compress
             """;
     }
 
-    private static HealthCheckItem BuildDismCheck(CommandResult result)
+    public static HealthCheckItem BuildDismCheck(CommandResult result)
     {
         var normalized = result.Output.Replace("\r", " ").Replace("\n", " ");
         var detail = normalized.Length > 700 ? normalized[..700] + "..." : normalized;
@@ -169,6 +170,10 @@ public sealed class SystemHealthAnalysisService
 
         var corruption = normalized.Contains("component store corruption detected", StringComparison.OrdinalIgnoreCase) &&
                          !normalized.Contains("no component store corruption detected", StringComparison.OrdinalIgnoreCase);
+        corruption |= normalized.Contains("The component store is repairable", StringComparison.OrdinalIgnoreCase) ||
+                      normalized.Contains("The component store cannot be repaired", StringComparison.OrdinalIgnoreCase);
+        if (!corruption && !normalized.Contains("No component store corruption detected", StringComparison.OrdinalIgnoreCase))
+            return new HealthCheckItem(DateTime.Now, "Windows", "Bilesen deposu", "Yorumlanamadi", "Yanıt tanınmadı", detail);
         return new HealthCheckItem(
             DateTime.Now,
             "Windows",
